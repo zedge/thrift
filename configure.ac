@@ -19,7 +19,7 @@
 
 AC_PREREQ(2.65)
 
-AC_INIT([thrift], [1.0.0-dev])
+AC_INIT([thrift], [1.0.0-dev.zedge-20141201])
 
 AC_CONFIG_AUX_DIR([.])
 

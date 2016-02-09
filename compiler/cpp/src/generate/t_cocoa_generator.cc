@@ -2587,7 +2587,8 @@ string t_cocoa_generator::type_name(t_type* ttype, bool class_ref, bool needs_mu
   if (ttype->is_base_type()) {
     return base_type_name((t_base_type*)ttype);
   } else if (ttype->is_enum()) {
-    return cocoa_prefix_ + ttype->get_name();
+    t_program* program = ttype->get_program();
+    return (program ? program->get_namespace("cocoa") : cocoa_prefix_) + ttype->get_name();
   } else if (ttype->is_map()) {
     t_map *map = (t_map *)ttype;
     result = needs_mutable ? "NSMutableDictionary" : "NSDictionary";

@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "Thrift"
-  s.version          = "20160121"
+  s.version          = "20160209"
   s.summary          = "Cocoa fork of Thrift framework"
 
 # This description is used to generate tags and improve search results.

@@ -1,18 +1,44 @@
+#
+# Be sure to run `pod lib lint ${POD_NAME}.podspec' to ensure this is a
+# valid spec before submitting.
+#
+# Any lines starting with a # are optional, but their use is encouraged
+# To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html
+#
+
 Pod::Spec.new do |s|
-  s.name          = "Thrift"
-  s.version       = "1.0.0"
-  s.summary       = "Apache Thrift is a lightweight, language-independent software stack with an associated code generation mechanism for RPC."
-  s.description   = <<-DESC
-The Apache Thrift software framework, for scalable cross-language services development, combines a software stack with a code generation engine to build services that work efficiently and seamlessly between C++, Java, Python, PHP, Ruby, Erlang, Perl, Haskell, C#, Cocoa, JavaScript, Node.js, Smalltalk, OCaml and Delphi and other languages.
-                    DESC
-  s.homepage      = "http://thrift.apache.org"
-  s.license       = { :type => 'Apache License, Version 2.0', :url => 'https://raw.github.com/apache/thrift/thrift-0.9.0/LICENSE' }
-  s.author        = { "The Apache Software Foundation" => "apache@apache.org" }
-  s.requires_arc  = true
-  s.ios.deployment_target = '7.0'
-  s.osx.deployment_target = '10.8'
-  s.ios.framework = 'CFNetwork'
-  s.osx.framework = 'CoreServices'
-  s.source        = { :git => "https://github.com/apache/thrift.git", :tag => "thrift-1.0.0" }
-  s.source_files  = 'lib/cocoa/src/**/*.{h,m,swift}'
+  s.name             = "Thrift"
+  s.version          = "20160121"
+  s.summary          = "Cocoa fork of Thrift framework"
+
+# This description is used to generate tags and improve search results.
+#   * Think: What does it do? Why did you write it? What is the focus?
+#   * Try to keep it short, snappy and to the point.
+#   * Write the description between the DESC delimiters below.
+#   * Finally, don't worry about the indent, CocoaPods strips it!  
+  s.description      = <<-DESC
+Generated Obj-C / Cocoa code for Thrift.
+                       DESC
+
+  s.homepage         = "https://github.com/eysteinbye/thrift"
+  s.license          = 'Proprietary'
+  s.author           = { "Mr. Jenkins" => "jenkins-ops@zedge.net" }
+  s.source           = { :git => "https://github.com/eysteinbye/thrift.git", :branch => "master" }
+
+
+#:tag => s.version.to_s
+
+  s.platform     = :ios, '7.0'
+  s.requires_arc = true
+
+  s.source_files = "*.{h,m}", "protocol/*.{h,m}", "server/*.{h,m}", "transport/*.{h,m}"
+
+#  s.public_header_files = '*.h'
+  s.public_header_files = "*.h", "protocol/*.h", "server/*.h", "transport/*.h"
+
+  #s.dependency 'thrift', '= 0.9.3'
+
+  # s.frameworks = 'UIKit', 'MapKit'
+  # s.dependency 'AFNetworking', '~> 2.3'
 end
+

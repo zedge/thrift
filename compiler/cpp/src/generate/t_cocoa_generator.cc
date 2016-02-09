@@ -2593,7 +2593,8 @@ string t_cocoa_generator::type_name(t_type* ttype, bool class_ref, bool needs_mu
   if (ttype->is_base_type()) {
     return base_type_name((t_base_type*)ttype);
   } else if (ttype->is_enum()) {
-    return cocoa_prefix_ + ttype->get_name();
+    t_program* program = ttype->get_program();
+    return (program ? program->get_namespace("cocoa") : cocoa_prefix_) + ttype->get_name();
   } else if (ttype->is_map()) {
     t_map *map = (t_map *)ttype;
     result = needs_mutable ? "NSMutableDictionary" : "NSDictionary";
@@ -2663,7 +2664,12 @@ string t_cocoa_generator::element_type_name(t_type* etype) {
     t_list *list = (t_list *)ttype;
     result = "NSArray<" + element_type_name(list->get_elem_type()) + "> *";
   } else if (ttype->is_struct() || ttype->is_xception()) {
-    result = cocoa_prefix_ + ttype->get_name() + " *";
+    t_program* program = ttype->get_program();
+    if (program != NULL) {
+      result = program->get_namespace("cocoa") + ttype->get_name();
+    } else {
+      result = cocoa_prefix_ + ttype->get_name();
+    }
   }
   
   return result;

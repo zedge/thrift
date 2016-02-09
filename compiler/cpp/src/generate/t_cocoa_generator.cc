@@ -2658,7 +2658,12 @@ string t_cocoa_generator::element_type_name(t_type* etype) {
     t_list *list = (t_list *)ttype;
     result = "NSArray<" + element_type_name(list->get_elem_type()) + "> *";
   } else if (ttype->is_struct() || ttype->is_xception()) {
-    result = cocoa_prefix_ + ttype->get_name() + " *";
+    t_program* program = ttype->get_program();
+    if (program != NULL) {
+      result = program->get_namespace("cocoa") + ttype->get_name();
+    } else {
+      result = cocoa_prefix_ + ttype->get_name();
+    }
   }
   
   return result;

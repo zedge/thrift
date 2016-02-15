@@ -25,20 +25,12 @@ Generated Obj-C / Cocoa code for Thrift.
   s.author           = { "Mr. Jenkins" => "jenkins-ops@zedge.net" }
   s.source           = { :git => "https://github.com/eysteinbye/thrift.git", :branch => "master" }
 
-
-#:tag => s.version.to_s
-
   s.platform     = :ios, '7.0'
   s.requires_arc = true
 
-  s.source_files = "*.{h,m}", "protocol/*.{h,m}", "server/*.{h,m}", "transport/*.{h,m}"
+  s.source_files = "lib/cocoa/src/*.{h,m}", "lib/cocoa/src/protocol/*.{h,m}", "lib/cocoa/src/server/*.{h,m}", "lib/cocoa/src/transport/*.{h,m}"
 
-#  s.public_header_files = '*.h'
-  s.public_header_files = "*.h", "protocol/*.h", "server/*.h", "transport/*.h"
+  s.public_header_files = "lib/cocoa/src/*.h", "lib/cocoa/src/protocol/*.h", "lib/cocoa/src/server/*.h", "lib/cocoa/src/transport/*.h"
 
-  #s.dependency 'thrift', '= 0.9.3'
-
-  # s.frameworks = 'UIKit', 'MapKit'
-  # s.dependency 'AFNetworking', '~> 2.3'
 end
 

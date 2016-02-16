@@ -28,7 +28,7 @@ Generated Obj-C / Cocoa code for Thrift.
   s.platform     = :ios, '7.0'
   s.requires_arc = true
 
-  s.source_files = "lib/cocoa/src/*.{h,m}", "lib/cocoa/src/protocol/*.{h,m}", "lib/cocoa/src/server/*.{h,m}", "lib/cocoa/src/transport/*.{h,m}"
+  s.source_files = "lib/cocoa/src/*.{h,m,swift}", "lib/cocoa/src/protocol/*.{h,m,swift}", "lib/cocoa/src/server/*.{h,m,swift}", "lib/cocoa/src/transport/*.{h,m,swift}"
 
   s.public_header_files = "lib/cocoa/src/*.h", "lib/cocoa/src/protocol/*.h", "lib/cocoa/src/server/*.h", "lib/cocoa/src/transport/*.h"
 

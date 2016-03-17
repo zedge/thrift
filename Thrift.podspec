@@ -25,7 +25,7 @@ Generated Obj-C / Cocoa code for Thrift.
   s.author           = { "Mr. Jenkins" => "jenkins-ops@zedge.net" }
   s.source           = { :git => "https://github.com/eysteinbye/thrift.git", :branch => "master" }
 
-  s.platform     = :ios, '7.0'
+  s.platform     = :ios, '9.0'
   s.requires_arc = true
 
   s.source_files = "lib/cocoa/src/*.{h,m,swift}", "lib/cocoa/src/protocol/*.{h,m,swift}", "lib/cocoa/src/server/*.{h,m,swift}", "lib/cocoa/src/transport/*.{h,m,swift}"

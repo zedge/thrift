@@ -792,7 +792,7 @@ void t_swift_generator::generate_swift_struct_reader(ofstream& out,
     
   indent(out) << "return " << tstruct->get_name() << "(";
   for (f_iter = fields.begin(); f_iter != fields.end();) {
-    out << (*f_iter)->get_name() << ": " << (*f_iter)->get_name();
+    out << (*f_iter)->get_name() << ": " << maybe_escape_identifier((*f_iter)->get_name());
     if (++f_iter != fields.end()) {
       out << ", ";
     }

@@ -132,6 +132,14 @@ public:
   void generate_swift_struct_result_writer(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_printable_extension(ofstream& out, t_struct* tstruct);
 
+  void generate_swift_union(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_implementation(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_equatable_extension(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_hashable_extension(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_thrift_extension(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_reader(ofstream& out, t_struct* tstruct);
+  void generate_swift_union_writer(ofstream& out, t_struct* tstruct);
+
   string function_result_helper_struct_type(t_service *tservice, t_function* tfunction);
   string function_args_helper_struct_type(t_service* tservice, t_function* tfunction);
   void generate_function_helpers(t_service *tservice, t_function* tfunction);
@@ -420,8 +428,13 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
  * @param tstruct The struct definition
  */
 void t_swift_generator::generate_struct(t_struct* tstruct) {
-  generate_swift_struct(f_decl_, tstruct, false);
-  generate_swift_struct_implementation(f_impl_, tstruct, false, false);
+  if (tstruct->is_union()) {
+    generate_swift_union(f_decl_, tstruct);
+    generate_swift_union_implementation(f_impl_, tstruct);
+  } else {
+    generate_swift_struct(f_decl_, tstruct, false);
+    generate_swift_struct_implementation(f_impl_, tstruct, false, false);
+  }
 }
 
 /**
@@ -964,6 +977,315 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
   
   block_close(out);
   
+  out << endl;
+}
+
+/**
+ * Generate the definition of a union.
+ *
+ * @param tstruct The struct definition
+ */
+void t_swift_generator::generate_swift_union(ofstream& out, t_struct* tstruct) {
+
+  indent(out) << "public indirect enum " << tstruct->get_name();
+
+  block_open(out);
+
+  // properties
+  const vector<t_field*>& members = tstruct->get_members();
+  vector<t_field*>::const_iterator m_iter;
+
+  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+    t_field* tfield = *m_iter;
+    out << endl;
+    indent(out) << "case " << maybe_escape_identifier(tfield->get_name())
+        << "(" << type_name(tfield->get_type()) << ")" << endl;
+  }
+
+  // Add extra case for unknown values, needed for extensibility
+  // TODO: could make optional or give configurable name..
+  out << endl;
+  indent(out) << "case ThriftUnknownValue" << endl;
+
+  out << endl;
+
+  // Need default initializer to work with 
+  indent(out) << "public init() { self = .ThriftUnknownValue }" << endl;
+
+  out << endl;
+
+  block_close(out);
+
+  out << endl;
+}
+
+/**
+ * Generate union implementation. Produces extensions that
+ * fulfill the requisite protocols to complete the value.
+ *
+ * @param tstruct The struct definition
+ */
+void t_swift_generator::generate_swift_union_implementation(ofstream& out, t_struct* tstruct) {
+
+  generate_swift_union_equatable_extension(out, tstruct);
+
+  generate_swift_union_hashable_extension(out, tstruct);
+  generate_swift_union_thrift_extension(out, tstruct);
+
+  out << endl << endl;
+}
+
+/**
+ * Generate the equatable protocol implementation for a union
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_union_equatable_extension(ofstream& out, t_struct* tstruct) {
+
+  indent(out) << "public func ==(lhs: " << type_name(tstruct) << ", rhs: " << type_name(tstruct) << ") -> Bool";
+
+  block_open(out);
+
+  indent(out) << "switch (lhs, rhs)";
+
+  block_open(out);
+
+  const vector<t_field*>& members = tstruct->get_members();
+  vector<t_field*>::const_iterator m_iter;
+  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+    t_field* tfield = *m_iter;
+    indent(out) << "case "
+      << "(." << maybe_escape_identifier(tfield->get_name()) << "(let a), "
+      << "." << maybe_escape_identifier(tfield->get_name()) << "(let b)): "
+      << "return a == b" << endl;
+  }
+
+  // Probably need this to avoid surprises
+  indent(out) << "case (.ThriftUnknownValue, .ThriftUnknownValue): return true" << endl;
+  indent(out) << "default: return false" << endl;
+
+  block_close(out);
+
+  block_close(out);
+
+  out << endl;
+}
+
+/**
+ * Generate the hashable protocol implementation for a union
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_union_hashable_extension(ofstream& out, t_struct* tstruct) {
+
+  indent(out) << "extension " << tstruct->get_name() << " : Hashable";
+  block_open(out);
+  
+  out << endl;
+  
+  indent(out) << "public var hashValue : Int";
+  block_open(out);
+  
+  const vector<t_field*>& members = tstruct->get_members();
+  vector<t_field*>::const_iterator m_iter;
+
+  indent(out) << "let prime = 31" << endl;
+  
+  indent(out) << "switch self";
+  block_open(out);
+
+  string exponated_prime = "prime";
+
+  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+    t_field* tfield = *m_iter;
+    indent(out) << "case ." << maybe_escape_identifier(tfield->get_name()) << "(let a): "
+      << "return " << exponated_prime << " &+ a.hashValue" << endl;
+    exponated_prime += " &* prime";
+  }
+
+  indent(out) << "case .ThriftUnknownValue: "
+    << "return " << exponated_prime << endl;
+
+  block_close(out);
+  
+  block_close(out);
+  
+  out << endl;
+  
+  block_close(out);
+
+  out << endl;
+}
+
+/**
+ * Generate the TStruct protocol implementation for a union
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_union_thrift_extension(ofstream& out, t_struct* tstruct) {
+  
+  indent(out) << "extension " << tstruct->get_name() << " : TStruct";
+  
+  block_open(out);
+  
+  out << endl;
+  
+  generate_swift_union_reader(out, tstruct);
+
+  generate_swift_union_writer(out, tstruct);
+  
+  block_close(out);
+  
+  out << endl;
+}
+
+/**
+ * Generates a function to read a union from
+ * from a protocol. (TStruct compliance)
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_union_reader(ofstream& out, t_struct* tstruct) {
+  
+  indent(out) << "public static func readValueFromProtocol(__proto: TProtocol) throws -> "
+              << tstruct->get_name();
+  
+  block_open(out);
+  
+  out << endl;
+  
+  indent(out) << "try __proto.readStructBegin()" << endl << endl;
+
+  indent(out) << "var __value : " << tstruct->get_name() << "!" << endl;
+
+  indent(out) << "let (_, fieldType, fieldID) = try __proto.readFieldBegin()" << endl << endl;
+
+  indent(out) << "switch (fieldID, fieldType)";
+  block_open(out);
+
+  // Union should contain exactly one value, if it contains less,
+  // signal a protol error
+  indent(out) << "case (_, .STOP):" << endl;
+  indent_up();
+  // TODO: will need to throw a better error here
+  indent(out) << "throw NSError(" << endl;
+  indent_up();
+  indent(out) << "domain: TProtocolErrorDomain," << endl;
+  indent(out) << "code: Int(TProtocolError.InvalidData.rawValue)," << endl;
+  indent(out) << "userInfo: [TProtocolErrorExtendedErrorKey: TProtocolExtendedError.MissingRequiredField.rawValue])" << endl << endl;
+  indent_down();
+  indent_down();
+
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator f_iter;
+
+  // Generate deserialization code for known cases
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+
+    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):" << endl;
+    indent_up();
+    indent(out) << "let __v = try __proto.readValue() as "
+                << type_name((*f_iter)->get_type()) << endl;
+    indent(out) << "__value = ." << maybe_escape_identifier((*f_iter)->get_name()) << "(__v)" << endl << endl;
+    indent_down();
+  }
+
+  // Unknown value
+  indent(out) << "case let (_, unknownType):" << endl;
+  indent_up();
+  indent(out) << "try __proto.skipType(unknownType)" << endl;
+  indent(out) << "__value = .ThriftUnknownValue" << endl;
+  indent_down();
+
+  block_close(out);
+
+  indent(out) << "try __proto.readFieldEnd()" << endl;
+
+  // Try to read another field. We expect exactly one field, so the only valid value here is .STOP
+  indent(out) << "let (_, secondFieldType, secondFieldID) = try __proto.readFieldBegin()" << endl << endl;
+  indent(out) << "if secondFieldType != .STOP";
+  block_open(out);
+  // TODO: will need to throw a better error here
+  indent(out) << "throw NSError(" << endl;
+  indent_up();
+  indent(out) << "domain: TProtocolErrorDomain," << endl;
+  indent(out) << "code: Int(TProtocolError.InvalidData.rawValue)," << endl;
+  indent(out) << "userInfo: [TProtocolErrorExtendedErrorKey: secondFieldID])" << endl;
+  indent_down();
+  block_close(out);
+
+  indent(out) << "try __proto.readFieldEnd()" << endl;
+
+  out << endl;
+
+  indent(out) << "try __proto.readStructEnd()" << endl;
+
+  indent(out) << "return __value" << endl;
+
+  block_close(out);
+
+  out << endl;
+}
+
+
+/**
+ * Generates a function to write a union to
+ * a protocol. (TStruct compliance)
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_union_writer(ofstream& out, t_struct* tstruct) {
+  
+  indent(out) << "public static func writeValue(__value: " << tstruct->get_name() << ", toProtocol __proto: TProtocol) throws";
+  
+  block_open(out);
+  
+  out << endl;
+
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator f_iter;
+
+  indent(out) << "try __proto.writeStructBeginWithName(\"" << tstruct->get_name() << "\")" << endl;
+  
+  out << endl;
+
+  indent(out) << "switch __value";
+  block_open(out);
+  
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    t_field *tfield = *f_iter;
+
+    indent(out) << "case ." << maybe_escape_identifier(tfield->get_name()) << "(let __v):" << endl;
+    indent_up();
+    indent(out) << "try __proto.writeFieldValue("
+                << "__v" << ", "
+                << "name: \"" << tfield->get_name() << "\", "
+                << "type: " << type_to_enum(tfield->get_type()) << ", "
+                << "id: " << tfield->get_key() << ")" << endl;
+    indent_down();
+
+    out << endl;
+  }
+
+  indent(out) << "case .ThriftUnknownValue:" << endl;
+  // TODO: Will need to throw a better error here
+  indent_up();
+  indent(out) << "throw NSError(" << endl;
+  indent_up();
+  indent(out) << "domain: TProtocolErrorDomain, " << endl;
+  indent(out) << "code: Int(TProtocolError.InvalidData.rawValue)," << endl;
+  indent(out) << "userInfo: [])" << endl;
+  indent_down();
+  indent_down();
+
+  block_close(out);
+
+  indent(out) << "try __proto.writeFieldStop()" << endl << endl;
+  
+  indent(out) << "try __proto.writeStructEnd()" << endl;
+
+  block_close(out);
+
   out << endl;
 }
 

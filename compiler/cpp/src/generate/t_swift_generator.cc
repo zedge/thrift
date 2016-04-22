@@ -2234,4 +2234,6 @@ THRIFT_REGISTER_GENERATOR(
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
     "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
+    "    prefix_namespace:\n"
+    "                     Use the provided swift namespace as a prefix for all symbols.\n"
     "    promise_kit:     Generate clients which invoke asynchronously via promises.\n")

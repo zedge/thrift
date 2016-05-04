@@ -404,7 +404,7 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
   vector<t_const*>::iterator c_iter;
   for (c_iter = consts.begin(); c_iter != consts.end(); ++c_iter) {
     t_type* type = (*c_iter)->get_type();
-    const_interface << "public let " << capitalize((*c_iter)->get_name()) << " : " << type_name(type) << " = ";
+    const_interface << "public let " << definition_name(capitalize((*c_iter)->get_name())) << " : " << type_name(type) << " = ";
     render_const_value(const_interface, type, (*c_iter)->get_value());
     const_interface << endl << endl;
   }
@@ -1273,7 +1273,7 @@ void t_swift_generator::generate_swift_service_client_send_function_implementati
                            "send_" + tfunction->get_name(),
                            tfunction->get_arglist());
 
-  string argsname = function_args_helper_struct_type(tservice, tfunction);
+  string argsname = definition_name(function_args_helper_struct_type(tservice, tfunction));
   t_struct* arg_struct = tfunction->get_arglist();
   
   // Open function
@@ -1349,7 +1349,7 @@ void t_swift_generator::generate_swift_service_client_recv_function_implementati
   
   indent(out) << "try __inProtocol.readResultMessageBegin() " << endl << endl;
   
-  string resultname = function_result_helper_struct_type(tservice, tfunction);
+  string resultname = definition_name(function_result_helper_struct_type(tservice, tfunction));
   indent(out);
   if (!tfunction->get_returntype()->is_void() || !tfunction->get_xceptions()->get_members().empty()) {
     out << "let __result = ";
@@ -1675,7 +1675,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
     
     t_function* tfunction = *f_iter;
     
-    string args_type = function_args_helper_struct_type(tservice, *f_iter);
+    string args_type = definition_name(function_args_helper_struct_type(tservice, *f_iter));
     
     out << indent() << "processorHandlers[\"" << tfunction->get_name() << "\"] = { sequenceID, inProtocol, outProtocol, handler in" << endl
         << endl;
@@ -1687,7 +1687,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
         << endl;
     
     if (!tfunction->is_oneway() ) {
-      string result_type = function_result_helper_struct_type(tservice, tfunction);
+      string result_type = definition_name(function_result_helper_struct_type(tservice, tfunction));
       indent(out) << "var result = " << result_type << "()" << endl;
     
       indent(out) << "do";
@@ -1920,7 +1920,7 @@ void t_swift_generator::render_const_value(ostream& out,
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    out << value->get_identifier();
+    out << definition_name(value->get_identifier());
   } else if (type->is_struct() || type->is_xception()) {
     
     out << type_name(type) << "(";

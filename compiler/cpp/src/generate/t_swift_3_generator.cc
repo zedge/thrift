@@ -56,7 +56,6 @@ public:
 
     log_unexpected_ = false;
     async_clients_ = false;
-    promise_kit_ = false;
     debug_descriptions_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
@@ -64,8 +63,6 @@ public:
         log_unexpected_ = true;
       } else if( iter->first.compare("async_clients") == 0) {
         async_clients_ = true;
-      } else if( iter->first.compare("promise_kit") == 0) {
-        promise_kit_ = true;
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
       } else {
@@ -175,7 +172,6 @@ public:
   string declare_property(t_field* tfield, bool is_private);
   string function_signature(t_function* tfunction);
   string async_function_signature(t_function* tfunction);
-  string promise_function_signature(t_function* tfunction);
   string function_name(t_function* tfunction);
   string argument_list(t_struct* tstruct, string protocol_name, bool is_internal);
   string type_to_enum(t_type* ttype, bool qualified=false);
@@ -233,7 +229,6 @@ private:
 
   bool log_unexpected_;
   bool async_clients_;
-  bool promise_kit_;
   bool debug_descriptions_;
 
   set<string> swift_reserved_words_;
@@ -300,10 +295,6 @@ string t_swift_3_generator::swift_thrift_imports() {
 
   vector<string> includes_list;
   includes_list.push_back("Thrift");
-
-  if (promise_kit_) {
-    includes_list.push_back("PromiseKit");
-  }
 
   ostringstream includes;
 
@@ -1119,9 +1110,6 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     out << endl;
     indent(out) << async_function_signature(*f_iter) << endl;
-    if (promise_kit_) {
-      indent(out) << promise_function_signature(*f_iter) << endl;
-    }
     out << endl;
   }
 
@@ -1568,65 +1556,6 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
 
     out << endl;
 
-    // Promise function
-    if (promise_kit_) {
-
-      indent(out) << "public " << promise_function_signature(*f_iter);
-      block_open(out);
-
-      out << indent() << "let (__promise, __fulfill, __reject) = Promise<" << type_name((*f_iter)->get_returntype()) << ">.pendingPromise()" << endl << endl
-          << indent() << "let __transport = __transportFactory.newTransport()" << endl
-          << indent() << "let __protocol = __protocolFactory.newProtocolOnTransport(__transport)" << endl
-          << endl;
-
-      generate_swift_service_client_send_async_function_invocation(out, *f_iter);
-
-      out << endl;
-
-      indent(out) << "__transport.flushWithCompletion(";
-
-      if ((*f_iter)->is_oneway()) {
-        out << "{ __fulfill() }, failure: { __reject($0) })" << endl;
-      }
-      else {
-        block_open(out);
-        indent(out) << "do";
-        block_open(out);
-
-        indent(out);
-        if (!(*f_iter)->get_returntype()->is_void()) {
-          out << "let result = ";
-        }
-        out << "try self.recv_" << (*f_iter)->get_name() << "(__protocol)" << endl;
-
-        out << indent() << "__fulfill(";
-        if (!(*f_iter)->get_returntype()->is_void()) {
-          out << "result";
-        }
-        out << ")" << endl;
-
-        block_close(out);
-        indent(out) << "catch let error";
-        block_open(out);
-        indent(out) << "__reject(error)" << endl;
-        block_close(out);
-        block_close(out);
-
-        indent(out) << ", failure: { error in " << endl;
-        indent_up();
-        indent(out) << "__reject(error)" << endl;
-        indent_down();
-        indent(out) << "})" << endl;
-      }
-
-      indent(out) << "return __promise" << endl;
-
-      block_close(out);
-
-      out << endl;
-
-    }
-
   }
 
   block_close(out);
@@ -2058,17 +1987,6 @@ string t_swift_3_generator::async_function_signature(t_function* tfunction) {
 }
 
 /**
- * Renders a function signature that returns asynchronously via promises.
- *
- * @param tfunction Function definition
- * @return String of rendered function definition
- */
-string t_swift_3_generator::promise_function_signature(t_function* tfunction) {
-  return "func " + function_name(tfunction) + "(" + argument_list(tfunction->get_arglist(), "", false) + ") throws "
-          + "-> Promise<" + type_name(tfunction->get_returntype()) + ">";
-}
-
-/**
  * Renders a verbose function name suitable for a Swift method
  */
 string t_swift_3_generator::function_name(t_function* tfunction) {
@@ -2205,5 +2123,4 @@ THRIFT_REGISTER_GENERATOR(
     "    log_unexpected:  Log every time an unexpected field ID or type is encountered.\n"
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
-    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
-    "    promise_kit:     Generate clients which invoke asynchronously via promises.\n")
+    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n")

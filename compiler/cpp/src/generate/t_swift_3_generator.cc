@@ -172,8 +172,7 @@ public:
   string declare_property(t_field* tfield, bool is_private);
   string function_signature(t_function* tfunction);
   string async_function_signature(t_function* tfunction);
-  string function_name(t_function* tfunction);
-  string argument_list(t_struct* tstruct, string protocol_name, bool is_internal);
+  string argument_list(t_struct* tstruct, string protocol_name, bool is_internal, bool default_val);
   string type_to_enum(t_type* ttype, bool qualified=false);
   string maybe_escape_identifier(const string& identifier);
   void populate_reserved_words();
@@ -265,6 +264,112 @@ void t_swift_3_generator::init_generator() {
 }
 
 /**
+ * Prints the value of a constant with the given type. Note that type checking
+ * is NOT performed in this function as it is always run beforehand using the
+ * validate_types method in main.cc
+ */
+void t_swift_3_generator::print_const_value(ostream& out,
+                                            string name,
+                                            t_type* type,
+                                            t_const_value* value,
+                                            bool defval,
+                                            bool is_property) {
+  // type = get_true_type(type);
+
+  // if (type->is_base_type()) {
+  //   string v2 = render_const_value(out, type, value);
+  //   indent(out);
+  //   if (defval)
+  //     out << type_name(type) << " ";
+  //   out << name << " = " << v2 << ";" << endl << endl;
+  // } else if (type->is_enum()) {
+  //   indent(out);
+  //   if (defval)
+  //     out << type_name(type) << " ";
+  //   out << name << " = " << render_const_value(out, type, value) << ";" << endl << endl;
+  // } else if (type->is_struct() || type->is_xception()) {
+  //   indent(out);
+  //   const vector<t_field*>& fields = ((t_struct*)type)->get_members();
+  //   vector<t_field*>::const_iterator f_iter;
+  //   const map<t_const_value*, t_const_value*>& val = value->get_map();
+  //   map<t_const_value*, t_const_value*>::const_iterator v_iter;
+  //   if (defval)
+  //     out << type_name(type) << " ";
+  //   out << name << " = [" << type_name(type, true) << " new];"
+  //       << endl;
+  //   for (v_iter = val.begin(); v_iter != val.end(); ++v_iter) {
+  //     t_type* field_type = NULL;
+  //     for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+  //       if ((*f_iter)->get_name() == v_iter->first->get_string()) {
+  //         field_type = (*f_iter)->get_type();
+  //       }
+  //     }
+  //     if (field_type == NULL) {
+  //       throw "type error: " + type->get_name() + " has no field " + v_iter->first->get_string();
+  //     }
+  //     string val = render_const_value(out, field_type, v_iter->second);
+  //     std::string cap_name = capitalize(v_iter->first->get_string());
+  //     indent(out) << "[" << name << " set" << cap_name << ":" << val << "];" << endl;
+  //   }
+  // } else if (type->is_map()) {
+  //   ostringstream mapout;
+  //   indent(mapout);
+  //   t_type* ktype = ((t_map*)type)->get_key_type();
+  //   t_type* vtype = ((t_map*)type)->get_val_type();
+  //   const map<t_const_value*, t_const_value*>& val = value->get_map();
+  //   map<t_const_value*, t_const_value*>::const_iterator v_iter;
+  //   if (defval)
+  //     mapout << type_name(type) << " ";
+  //   mapout << name << " = @{";
+  //   for (v_iter = val.begin(); v_iter != val.end();) {
+  //     mapout << render_const_value(out, ktype, v_iter->first, true) << ": "
+  //         << render_const_value(out, vtype, v_iter->second, true);
+  //     if (++v_iter != val.end()) {
+  //       mapout << ", ";
+  //     }
+  //   }
+  //   mapout << "}";
+  //   out << mapout.str();
+  // } else if (type->is_list()) {
+  //   ostringstream listout;
+  //   indent(listout);
+  //   t_type* etype = ((t_list*)type)->get_elem_type();
+  //   const vector<t_const_value*>& val = value->get_list();
+  //   vector<t_const_value*>::const_iterator v_iter;
+  //   if (defval)
+  //     listout << type_name(type) << " ";
+  //   listout << name << " = @[";
+  //   for (v_iter = val.begin(); v_iter != val.end();) {
+  //     listout << render_const_value(out, etype, *v_iter, true);
+  //     if (++v_iter != val.end()) {
+  //       listout << ", ";
+  //     }
+  //   }
+  //   listout << "]";
+  //   out << listout.str();
+  // } else if (type->is_set()) {
+  //   ostringstream setout;
+  //   indent(setout);
+  //   t_type* etype = ((t_set*)type)->get_elem_type();
+  //   const vector<t_const_value*>& val = value->get_list();
+  //   vector<t_const_value*>::const_iterator v_iter;
+  //   if (defval)
+  //     setout << type_name(type) << " ";
+  //   setout << name << " = [NSSet setWithArray:@[";
+  //   for (v_iter = val.begin(); v_iter != val.end();) {
+  //     setout << render_const_value(out, etype, *v_iter, true);
+  //     if (++v_iter != val.end()) {
+  //       setout << ", ";
+  //     }
+  //   }
+  //   setout << "]]";
+  //   out << setout.str();
+  // } else {
+  //   throw "compiler error: no const of type " + type->get_name();
+  // }
+}
+
+/**
  * Prints standard Cocoa imports
  *
  * @return List of imports for Cocoa libraries
@@ -328,6 +433,7 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
   f_decl_ << endl;
 }
 
+
 /**
  * Generates code for an enumerated type. In Swift, this is
  * essentially the same as the thrift definition itself, using
@@ -336,44 +442,51 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_3_generator::generate_enum(t_enum* tenum) {
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
+  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32, TEnum";
   block_open(f_decl_);
 
   vector<t_enum_value*> constants = tenum->get_constants();
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-    f_decl_ << indent() << "case " << (*c_iter)->get_name()
+    string case_name = (*c_iter)->get_name();
+    std::transform(case_name.begin(), case_name.end(), case_name.begin(), ::tolower);
+    f_decl_ << indent() << "case " << maybe_escape_identifier(case_name)
             << " = " << (*c_iter)->get_value() << endl;
   }
 
   f_decl_ << endl;
-  f_decl_ << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
+  f_decl_ << indent() << "public init()";
+  block_open(f_decl_);
+  string first_case = constants.front()->get_name();
+  std::transform(first_case.begin(), first_case.end(), first_case.begin(), ::tolower);
+  f_decl_ << indent() << "self = ." << maybe_escape_identifier(first_case) << endl;
+  block_close(f_decl_);
 
   block_close(f_decl_);
   f_decl_ << endl;
 
-  f_impl_ << indent() << "extension " << tenum->get_name() << " : TEnum";
-  block_open(f_impl_);
+  // f_impl_ << indent() << "extension " << tenum->get_name() << " : TEnum";
+  // block_open(f_impl_);
 
-  f_impl_ << endl;
+  // f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
-  block_open(f_impl_);
-  f_impl_ << indent() << "var raw = Int32()" << endl
-          << indent() << "try proto.readI32(&raw)" << endl
-          << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+  // f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
+  // block_open(f_impl_);
+  // f_impl_ << indent() << "var raw = Int32()" << endl
+  //         << indent() << "try proto.readI32(&raw)" << endl
+  //         << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
+  // block_close(f_impl_);
+  // f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
-  block_open(f_impl_);
-  f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+  // f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
+  // block_open(f_impl_);
+  // f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
+  // block_close(f_impl_);
+  // f_impl_ << endl;
 
-  block_close(f_impl_);
-  f_impl_ << endl;
+  // block_close(f_impl_);
+  // f_impl_ << endl;
 }
 
 /**
@@ -1257,7 +1370,7 @@ void t_swift_3_generator::generate_swift_service_client_send_function_implementa
   t_struct* arg_struct = tfunction->get_arglist();
 
   // Open function
-  indent(out) << "private func " << send_function.get_name() << "(" << argument_list(tfunction->get_arglist(), needs_protocol ? "__outProtocol" : "", true) << ") throws";
+  indent(out) << "private func " << send_function.get_name() << "(" << argument_list(tfunction->get_arglist(), needs_protocol ? "__outProtocol" : "", true, true) << ") throws";
   block_open(out);
 
   out << endl;
@@ -1618,7 +1731,7 @@ void t_swift_3_generator::generate_swift_service_server_implementation(ofstream&
       if (!tfunction->get_returntype()->is_void()) {
         out << "result.success = ";
       }
-      out << "try handler." << function_name(tfunction) << "(";
+      out << "try handler." << tfunction->get_name() << "(";
 
       t_struct* arg_struct = tfunction->get_arglist();
       const vector<t_field*>& fields = arg_struct->get_members();
@@ -1763,7 +1876,7 @@ string t_swift_3_generator::base_type_name(t_base_type* type) {
     return "Void";
   case t_base_type::TYPE_STRING:
     if (type->is_binary()) {
-      return "TBinary";
+      return "Data";
     } else {
       return "String";
     }
@@ -1956,9 +2069,9 @@ string t_swift_3_generator::declare_property(t_field* tfield, bool is_private) {
  */
 string t_swift_3_generator::function_signature(t_function* tfunction) {
 
-  string result = "func " + function_name(tfunction);
+  string result = "func " + tfunction->get_name();
 
-  result += "(" + argument_list(tfunction->get_arglist(), "", false) + ") throws";
+  result += "(" + argument_list(tfunction->get_arglist(), "", false, false) + ") throws";
 
   t_type* ttype = tfunction->get_returntype();
   if (!ttype->is_void()) {
@@ -1977,34 +2090,22 @@ string t_swift_3_generator::function_signature(t_function* tfunction) {
 string t_swift_3_generator::async_function_signature(t_function* tfunction) {
   t_type* ttype = tfunction->get_returntype();
   t_struct* targlist = tfunction->get_arglist();
-  string response_param = "(" + ((ttype->is_void()) ? "" : type_name(ttype)) + ") -> Void";
-  string result = "func " + function_name(tfunction);
-  result += "(" + argument_list(tfunction->get_arglist(), "", false)
+  string response_string = "(";
+  response_string += ((ttype->is_void()) ? "" : type_name(ttype));
+  response_string += ((ttype->is_void()) ? "" : ", ");
+  response_string += "ErrorProtocol?) -> Void";
+  string result = "func " + tfunction->get_name();
+  result += "(" + argument_list(tfunction->get_arglist(), "", false, false)
           + (targlist->get_members().size() ? ", " : "")
-          + "success: " + response_param + ", "
-          + "failure: (NSError) -> Void) throws";
+          + "completion: " + response_string + ") throws";
   return result;
 }
 
-/**
- * Renders a verbose function name suitable for a Swift method
- */
-string t_swift_3_generator::function_name(t_function* tfunction) {
-  string name = tfunction->get_name();
-  if (!tfunction->get_arglist()->get_members().empty()) {
-    string first_arg = tfunction->get_arglist()->get_members().front()->get_name();
-    if (name.size() < first_arg.size() ||
-        lowercase(name.substr(name.size()-first_arg.size())) != lowercase(first_arg)) {
-      name += "With" + capitalize(tfunction->get_arglist()->get_members()[0]->get_name());
-    }
-  }
-  return name;
-}
 
 /**
  * Renders a Swift method argument list
  */
-string t_swift_3_generator::argument_list(t_struct* tstruct, string protocol_name, bool is_internal) {
+string t_swift_3_generator::argument_list(t_struct* tstruct, string protocol_name, bool is_internal, bool default_val) {
   string result = "";
   bool include_protocol = !protocol_name.empty();
 
@@ -2017,15 +2118,14 @@ string t_swift_3_generator::argument_list(t_struct* tstruct, string protocol_nam
       result += ", ";
     }
   }
-  else if (!fields.empty() && is_internal) {
-    // Force first argument to be named
-    result += fields.front()->get_name() + " ";
-  }
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field* arg = *f_iter;
     result += arg->get_name() + ": " + type_name(arg->get_type());
-
+    t_const_value* default_value = arg->get_value();
+    if (default_val && default_value != NULL) {
+      // result << default_val;
+    }
     if (++f_iter != fields.end()) {
       result += ", ";
     }
@@ -2087,30 +2187,30 @@ string t_swift_3_generator::type_to_enum(t_type* type, bool qualified) {
     case t_base_type::TYPE_VOID:
       throw "NO T_VOID CONSTRUCT";
     case t_base_type::TYPE_STRING:
-      return result + "STRING";
+      return result + "string";
     case t_base_type::TYPE_BOOL:
-      return result + "BOOL";
+      return result + "bool";
     case t_base_type::TYPE_I8:
-      return result + "BYTE";
+      return result + "byte";
     case t_base_type::TYPE_I16:
-      return result + "I16";
+      return result + "i16";
     case t_base_type::TYPE_I32:
-      return result + "I32";
+      return result + "i32";
     case t_base_type::TYPE_I64:
-      return result + "I64";
+      return result + "i64";
     case t_base_type::TYPE_DOUBLE:
-      return result + "DOUBLE";
+      return result + "double";
     }
   } else if (type->is_enum()) {
-    return result + "I32";
+    return result + "i32";
   } else if (type->is_struct() || type->is_xception()) {
-    return result + "STRUCT";
+    return result + "struct";
   } else if (type->is_map()) {
-    return result + "MAP";
+    return result + "map";
   } else if (type->is_set()) {
-    return result + "SET";
+    return result + "set";
   } else if (type->is_list()) {
-    return result + "LIST";
+    return result + "list";
   }
 
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();

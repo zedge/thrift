@@ -439,12 +439,13 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
 /**
  * Generates code for an enumerated type. In Swift, this is
  * essentially the same as the thrift definition itself, using
- * Swift syntax.  Conforms to TEnum which already implementes read/write
+ * Swift syntax.  Conforms to RawRepresentable<Int32> which
+ * implementes read/write.
  *
  * @param tenum The enumeration
  */
 void t_swift_3_generator::generate_enum(t_enum* tenum) {
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32, TEnum";
+  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
   block_open(f_decl_);
 
   vector<t_enum_value*> constants = tenum->get_constants();
@@ -510,7 +511,7 @@ void t_swift_3_generator::generate_consts(vector<t_const*> consts) {
  * @param tstruct The struct definition
  */
 void t_swift_3_generator::generate_struct(t_struct* tstruct) {
-  generate_swift_struct(f_decl_, tstruct, false);
+  generate_swift_struct(f_decl_, tstruct, false, false);
   generate_swift_struct_implementation(f_impl_, tstruct, false, false);
 }
 
@@ -520,7 +521,7 @@ void t_swift_3_generator::generate_struct(t_struct* tstruct) {
  * @param tstruct The struct definition
  */
 void t_swift_3_generator::generate_xception(t_struct* txception) {
-  generate_swift_struct(f_decl_, txception, false);
+  generate_swift_struct(f_decl_, txception, false, false);
   generate_swift_struct_implementation(f_impl_, txception, false, false);
 }
 
@@ -556,7 +557,8 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
  */
 void t_swift_3_generator::generate_swift_struct(ofstream& out,
                                               t_struct* tstruct,
-                                              bool is_private) {
+                                              bool is_private,
+                                              bool is_result) {
 
 
   string doc = tstruct->get_doc();
@@ -611,7 +613,9 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
   // indent(out) << visibility << " init() { }" << endl;
 
   out << endl;
-
+  if (!struct_has_required_fields(tstruct)) {
+    indent(out) << visibility << " init() { }" << endl;
+  }
   if (struct_has_required_fields(tstruct)) {
     generate_swift_struct_init(out, tstruct, false, is_private);
   }
@@ -1197,7 +1201,7 @@ void t_swift_3_generator::generate_swift_service_helpers(t_service* tservice) {
       qname_ts.append(*m_iter);
     }
 
-    generate_swift_struct(f_impl_, &qname_ts, true);
+    generate_swift_struct(f_impl_, &qname_ts, true, true);
     generate_swift_struct_implementation(f_impl_, &qname_ts, false, true);
     generate_function_helpers(tservice, *f_iter);
   }
@@ -1245,7 +1249,7 @@ void t_swift_3_generator::generate_function_helpers(t_service *tservice, t_funct
   }
 
   // generate the result struct
-  generate_swift_struct(f_impl_, &result, true);
+  generate_swift_struct(f_impl_, &result, true, true);
   generate_swift_struct_implementation(f_impl_, &result, true, true);
 
   for (f_iter = result.get_members().begin(); f_iter != result.get_members().end(); ++f_iter) {

@@ -80,7 +80,7 @@ public class TSocketServer {
     CFSocketInvalidate(sock)
     
     // register for notifications of accepted incoming connections
-    NotificationCenter.default().addObserver(forName: .NSFileHandleConnectionAccepted,
+    NotificationCenter.default.addObserver(forName: .NSFileHandleConnectionAccepted,
                                              object: nil, queue: nil) {
       [weak self] notification in
       guard let strongSelf = self else { return }
@@ -95,7 +95,7 @@ public class TSocketServer {
   }
   
   deinit {
-    NotificationCenter.default().removeObserver(self)
+    NotificationCenter.default.removeObserver(self)
   }
   
   func connectionAcctepted(_ socket: FileHandle) {
@@ -119,7 +119,7 @@ public class TSocketServer {
       print("Error processign request: \(error)")
     }
     DispatchQueue.main.async {
-      NotificationCenter.default()
+      NotificationCenter.default
         .post(name: Notification.Name(rawValue: TSocketServerClientConnectionFinished),
                               object: self,
                               userInfo: [TSocketServerProcessorKey: (processor as? AnyObject)!,

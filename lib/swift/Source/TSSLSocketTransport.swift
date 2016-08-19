@@ -62,7 +62,7 @@ public class TSSLSocketTransport: TNSStreamTransport {
     }
     
     /* open a connection */
-    // need a non-self ref to sd, otherwise the withUnsafePointer complains
+    // need a non-self ref to sd, otherwise the j complains
     let sd_local = sd
     let connectResult = withUnsafePointer(&pin) {
       connect(sd_local, UnsafePointer<sockaddr>($0), socklen_t(sizeofValue(pin)))
@@ -97,11 +97,11 @@ public class TSSLSocketTransport: TNSStreamTransport {
                               settings)
       
       inputStream = readStream!.takeRetainedValue()
-      inputStream?.schedule(in: RunLoop.current(), forMode: RunLoopMode.defaultRunLoopMode)
+      inputStream?.schedule(in: .current, forMode: .defaultRunLoopMode)
       inputStream?.open()
       
       outputStream = writeStream!.takeRetainedValue()
-      outputStream?.schedule(in: RunLoop.current(), forMode: RunLoopMode.defaultRunLoopMode)
+      outputStream?.schedule(in: .current, forMode: .defaultRunLoopMode)
       outputStream?.open()
       
       readStream?.release()
@@ -161,10 +161,10 @@ extension TSSLSocketTransport: StreamDelegate {
       var newPolicies: CFMutableArray?
       
       repeat {
-        let trust: SecTrust = aStream.property(forKey: kCFStreamPropertySSLPeerTrust as String) as! SecTrust
+        let trust: SecTrust = aStream.property(forKey: .SSLPeerTrust) as! SecTrust
         
         // Add new policy to current list of policies
-        guard let policy = SecPolicyCreateSSL(false, sslHostname) else { return }
+        let policy = SecPolicyCreateSSL(false, sslHostname)
         var ppolicy = policy // mutable for pointer
         let policies: UnsafeMutablePointer<CFArray?>? = nil
         if SecTrustCopyPolicies(trust, policies!) != errSecSuccess {

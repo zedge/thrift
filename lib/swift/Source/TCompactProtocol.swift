@@ -221,6 +221,8 @@ public class TCompactProtocol: TProtocol {
     case .map:    return .map
     case .set:    return .set
     case .list:   return .list
+    case .utf8:   return .binary
+    case .utf16:  return .binary
     }
   }
   
@@ -428,10 +430,12 @@ public class TCompactProtocol: TProtocol {
   
   public func readListEnd() throws { }
   
-  public func writeMessageBegin(name: String, type messageType: TMessageType, sequenceID: Int32) throws {
+  public func writeMessageBegin(name: String,
+                                type messageType: TMessageType,
+                                sequenceID: Int32) throws {
     try writebyteDirect(TCompactProtocol.protocolID)
     let nextByte: UInt8 = (TCompactProtocol.version & TCType.typeMask) |
-                          (UInt8((UInt32(messageType.rawValue) << UInt32(TCType.typeShiftAmount)))  &
+                          (UInt8((UInt32(messageType.rawValue) << UInt32(TCType.typeShiftAmount))) &
                           TCType.typeMask)
     try writebyteDirect(nextByte)
     try writeVarint32(UInt32(sequenceID))
@@ -454,18 +458,26 @@ public class TCompactProtocol: TProtocol {
     lastField.removeLast()
   }
   
-  public func writeFieldBegin(name: String, type fieldType: TType, fieldID: Int32) throws {
+  public func writeFieldBegin(name: String,
+                              type fieldType: TType,
+                              fieldID: Int32) throws {
     if fieldType == .bool {
       boolFieldName = name
       boolFieldType = fieldType
       boolFieldId = fieldID
       return
     } else {
-      try writeFieldBeginInternal(name: name, type: fieldType, fieldID: fieldID, typeOverride: 0xFF)
+      try writeFieldBeginInternal(name: name,
+                                  type: fieldType,
+                                  fieldID: fieldID,
+                                  typeOverride: 0xFF)
     }
   }
   
-  func writeFieldBeginInternal(name: String, type fieldType: TType, fieldID: Int32, typeOverride: UInt8) throws {
+  func writeFieldBeginInternal(name: String,
+                               type fieldType: TType,
+                               fieldID: Int32,
+                               typeOverride: UInt8) throws {
     
     let typeToWrite = typeOverride == 0xFF ? compactType(fieldType).rawValue : typeOverride
     
@@ -521,10 +533,13 @@ public class TCompactProtocol: TProtocol {
   }
   
   public func write(_ value: Bool) throws {
-    if let boolFieldId = boolFieldId, boolFieldType = boolFieldType, boolFieldName = boolFieldName {
+    if let boolFieldId = boolFieldId, let boolFieldType = boolFieldType,
+       let boolFieldName = boolFieldName {
+      
       // we haven't written the field header yet
+      let compactType: TCType = value ? .boolean_TRUE : .boolean_FALSE
       try writeFieldBeginInternal(name: boolFieldName, type: boolFieldType, fieldID: boolFieldId,
-                                  typeOverride: value ? TCType.boolean_TRUE.rawValue : TCType.boolean_FALSE.rawValue)
+                                  typeOverride: compactType.rawValue)
       self.boolFieldId = nil
       self.boolFieldType = nil
       self.boolFieldName = nil

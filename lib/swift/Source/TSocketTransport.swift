@@ -20,10 +20,16 @@
 import Foundation
 
 // Temporary until Foundation includes these as proper keys
+// FIXME: Remove when ready
 extension CFStreamPropertyKey {
   static let shouldCloseNativeSocket  = CFStreamPropertyKey(kCFStreamPropertyShouldCloseNativeSocket)
+  // Exists as Stream.PropertyKey.socketSecuritylevelKey but doesn't work with CFReadStreamSetProperty
   static let socketSecurityLevel      = CFStreamPropertyKey(kCFStreamPropertySocketSecurityLevel)
   static let SSLSettings              = CFStreamPropertyKey(kCFStreamPropertySSLSettings)
+}
+
+extension Stream.PropertyKey {
+  static let SSLPeerTrust = Stream.PropertyKey(kCFStreamPropertySSLPeerTrust as String)
 }
 
 public class TSocketTransport: TNSStreamTransport {
@@ -41,16 +47,16 @@ public class TSocketTransport: TNSStreamTransport {
                                        &writeStream)
     
     if let readStream = readStream?.takeRetainedValue(),
-           writeStream = writeStream?.takeRetainedValue() {
+       let writeStream = writeStream?.takeRetainedValue() {
       CFReadStreamSetProperty(readStream, .shouldCloseNativeSocket, kCFBooleanTrue)
       CFWriteStreamSetProperty(writeStream, .shouldCloseNativeSocket, kCFBooleanTrue)
       
       inputStream = readStream
-      inputStream.schedule(in: RunLoop.current(), forMode: .defaultRunLoopMode)
+      inputStream.schedule(in: .current, forMode: .defaultRunLoopMode)
       inputStream.open()
       
       outputStream = writeStream
-      outputStream.schedule(in: RunLoop.current(), forMode: .defaultRunLoopMode)
+      outputStream.schedule(in: .current, forMode: .defaultRunLoopMode)
       outputStream.open()
 
     } else {

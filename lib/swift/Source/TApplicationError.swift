@@ -72,13 +72,17 @@ public struct TApplicationError : TError {
     }
     
     public var description: String {
+      /// Output "for #methodName" if method is not nil else empty
+      let methodUnwrap: (String?) -> String =  { method in
+        return "\(method == nil ? "" : " for \(method ?? "")")"
+      }
       switch self {
       case .unknown:                      return "Unknown TApplicationError"
-      case .unknownMethod(let method):    return "Unknown Method\(method == nil ? "" : " for \(method ?? "")")"
+      case .unknownMethod(let method):    return "Unknown Method\(methodUnwrap(method))"
       case .invalidMessageType:           return "Invalid Message Type"
-      case .wrongMethodName(let method):  return "Wrong Method Name\(method == nil ? "" : " for \(method ?? "")")"
+      case .wrongMethodName(let method):  return "Wrong Method Name\(methodUnwrap(method))"
       case .badSequenceId:                return "Bad Sequence ID"
-      case .missingResult(let method):    return "Missing Result\(method == nil ? "" : " for \(method ?? "")")"
+      case .missingResult(let method):    return "Missing Result\(methodUnwrap(method))"
       case .internalError:                return "Internal Error"
       case .protocolError:                return "Protocol Error"
       case .invalidProtocol:              return "Invalid Protocol"

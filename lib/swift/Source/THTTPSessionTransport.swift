@@ -148,7 +148,7 @@ public class THTTPSessionTransport: TAsyncTransport {
       error = taskError
     }
     
-    if let error = error where task == nil {
+    if let error = error, task == nil {
       completed(self, error)
     }
     task?.resume()

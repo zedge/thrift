@@ -97,7 +97,7 @@ public class THTTPTransport: TTransport {
 
     // make the HTTP Request
     var response: URLResponse?
-    URLSession.shared().dataTask(with: request!)
+    URLSession.shared.dataTask(with: request!)
     
     responseData = try NSURLConnection.sendSynchronousRequest(request!, returning: &response)
     

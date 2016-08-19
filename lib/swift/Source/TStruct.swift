@@ -77,7 +77,7 @@ public extension TStruct {
       // we then try to bind value as TSerializable to ignore any extension properties
       // and the like and verify the property exists and grab the Thrift
       // property ID at the same time
-      if let tval = unwrap(any: propValue) as? TSerializable, id = Self.fieldIds[propName] {
+      if let tval = unwrap(any: propValue) as? TSerializable, let id = Self.fieldIds[propName] {
         try block(name: propName, value: tval, id: id)
       }
     }

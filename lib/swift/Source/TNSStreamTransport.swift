@@ -116,7 +116,7 @@ public class TNSStreamTransport: NSObject, TTransport {
       CFReadStreamSetProperty(input, .shouldCloseNativeSocket, kCFBooleanTrue)
       input?.delegate = nil
       input?.close()
-      input?.remove(from: RunLoop.current(), forMode: RunLoopMode.defaultRunLoopMode)
+      input?.remove(from: .current, forMode: .defaultRunLoopMode)
       input = nil
     }
     
@@ -125,7 +125,7 @@ public class TNSStreamTransport: NSObject, TTransport {
       CFWriteStreamSetProperty(output, .shouldCloseNativeSocket, kCFBooleanTrue)
       output?.delegate = nil
       output?.close()
-      output?.remove(from: RunLoop.current(), forMode: RunLoopMode.defaultRunLoopMode)
+      output?.remove(from: .current, forMode: .defaultRunLoopMode)
       output = nil
     }
   }

@@ -516,7 +516,7 @@ void t_swift_3_generator::generate_struct(t_struct* tstruct) {
 }
 
 /**
- * Exceptions are structs, but they conform to ErrorProtocol
+ * Exceptions are structs, but they conform to Error
  *
  * @param tstruct The struct definition
  */
@@ -581,12 +581,12 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
       out << "/// " << (*d_iter) << endl;
     }
   }
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   out << indent() << visibility << " final class " << tstruct->get_name();
 
   if (tstruct->is_xception()) {
-    out << " : ErrorProtocol";
+    out << " : Swift.Error"; // Error seems to be a common exception name in thrift
   }
 
   block_open(out);
@@ -641,7 +641,7 @@ void t_swift_3_generator::generate_swift_struct_init(ofstream& out,
                                                    bool all,
                                                    bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " init(";
 
@@ -689,7 +689,7 @@ void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out
                                                                  t_struct* tstruct,
                                                                  bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << "extension " << tstruct->get_name() << " : Hashable";
 
@@ -743,7 +743,7 @@ void t_swift_3_generator::generate_swift_struct_equatable_extension(ofstream& ou
                                                                   t_struct* tstruct,
                                                                   bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " func ==(lhs: " << type_name(tstruct) << ", rhs: " << type_name(tstruct) << ") -> Bool";
 
@@ -829,7 +829,7 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
 
   out << endl;
 
-  string access = (is_private) ? "private" : "public";
+  string access = (is_private) ? "fileprivate" : "public";
   // generate fieldID's dictionary
   out << indent() << access << " static var fieldIds: [String: Int32]";
   block_open(out);
@@ -873,7 +873,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out,
                                                      t_struct* tstruct,
                                                      bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " static func read(from proto: TProtocol) throws -> "
               << tstruct->get_name();
@@ -2103,7 +2103,7 @@ void t_swift_3_generator::render_const_value(ostream& out,
  */
 string t_swift_3_generator::declare_property(t_field* tfield, bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
+  string visibility = is_private ? "fileprivate" : "public";
 
   ostringstream render;
 
@@ -2151,7 +2151,7 @@ string t_swift_3_generator::async_function_signature(t_function* tfunction) {
   string response_string = "(";
   response_string += ((ttype->is_void()) ? "" : (type_name(ttype)) + "?");
   response_string += ((ttype->is_void()) ? "" : ", ");
-  response_string += "ErrorProtocol?) -> Void";
+  response_string += "Error?) -> Void";
   string result = "func " + tfunction->get_name();
   result += "(" + argument_list(tfunction->get_arglist(), "", false, false)
           + (targlist->get_members().size() ? ", " : "")

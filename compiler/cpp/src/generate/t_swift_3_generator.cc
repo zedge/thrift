@@ -176,6 +176,7 @@ public:
   string type_to_enum(t_type* ttype, bool qualified=false);
   string maybe_escape_identifier(const string& identifier);
   string enum_case_name(t_enum_value* tenum_case, bool declaration);
+  string enum_const_name(string enum_identifier);
   void populate_reserved_words();
   void generate_docstring(ofstream& out, string& doc);
 
@@ -439,13 +440,13 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
 /**
  * Generates code for an enumerated type. In Swift, this is
  * essentially the same as the thrift definition itself, using
- * Swift syntax.  Conforms to RawRepresentable<Int32> which
+ * Swift syntax.  Conforms to TEnum which
  * implementes read/write.
  *
  * @param tenum The enumeration
  */
 void t_swift_3_generator::generate_enum(t_enum* tenum) {
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
+  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32, TEnum";
   block_open(f_decl_);
 
   vector<t_enum_value*> constants = tenum->get_constants();
@@ -476,6 +477,22 @@ string t_swift_3_generator::enum_case_name(t_enum_value* tenum_case, bool declar
   }
   return name;
 }
+
+/**
+ * Renders a constant enum value by transforming the value portion to lowercase
+ * for Swift style.
+ */
+string t_swift_3_generator::enum_const_name(string enum_identifier) {
+  string::iterator it;
+  for (it = enum_identifier.begin(); it < enum_identifier.end(); ++it) {
+    if ((*it) == '.') {
+      break;
+    }
+  }
+  std::transform(it, enum_identifier.end(), it, ::tolower);
+  return enum_identifier;
+}
+
 /**
  * Generates public constants for all Thrift constants.
  *
@@ -836,9 +853,14 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
   out << indent() << "return [";
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
-
+  bool wrote = false;
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    wrote = true;
     out << "\"" << (*f_iter)->get_name() << "\": " << (*f_iter)->get_key() << ", ";
+  }
+  if (!wrote) {
+    // pad a colon
+    out << ":";
   }
   out << "]" << endl;
   block_close(out);
@@ -1992,7 +2014,7 @@ void t_swift_3_generator::render_const_value(ostream& out,
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    out << value->get_identifier();
+    out << enum_const_name(value->get_identifier());
   } else if (type->is_struct() || type->is_xception()) {
 
     out << type_name(type) << "(";

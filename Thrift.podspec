@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "Thrift"
-  s.version          = "20160209"
+  s.version          = "20160827"
   s.summary          = "Cocoa fork of Thrift framework"
 
 # This description is used to generate tags and improve search results.
@@ -25,7 +25,7 @@ Generated Obj-C / Cocoa code for Thrift.
   s.author           = { "Mr. Jenkins" => "jenkins-ops@zedge.net" }
   s.source           = { :git => "https://github.com/eysteinbye/thrift.git", :branch => "master" }
 
-  s.platform     = :ios, '9.0'
+  s.platform     = :ios, '10.0'
   s.requires_arc = true
 
   s.source_files = "lib/cocoa/src/*.{h,m,swift}", "lib/cocoa/src/protocol/*.{h,m,swift}", "lib/cocoa/src/server/*.{h,m,swift}", "lib/cocoa/src/transport/*.{h,m,swift}"

@@ -41,9 +41,9 @@ using std::vector;
 static const string endl = "\n"; // avoid ostream << std::endl flushes
 
 /**
- * Swift code generator.
+ * Swift 3 code generator.
  *
- * Designed from the Objective-C (aka Cocoa) generator.
+ * Designed from the Swift/Cocoa code generator(s)
  */
 class t_swift_3_generator : public t_oop_generator {
 public:
@@ -57,12 +57,15 @@ public:
     log_unexpected_ = false;
     async_clients_ = false;
     debug_descriptions_ = false;
+    no_strict_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
         log_unexpected_ = true;
       } else if( iter->first.compare("async_clients") == 0) {
         async_clients_ = true;
+      } else if( iter->first.compare("no_strict") == 0) {
+        no_strict_ = true;
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
       } else {
@@ -232,6 +235,7 @@ private:
   bool log_unexpected_;
   bool async_clients_;
   bool debug_descriptions_;
+  bool no_strict_;
 
   set<string> swift_reserved_words_;
 };
@@ -975,7 +979,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out,
 
   }
 
-  indent(out) << "case let (_, unknownType):  try proto.skipType(unknownType)" << endl;
+  indent(out) << "case let (_, unknownType):  try proto.skip(type: unknownType)" << endl;
 
   block_close(out);
 
@@ -1403,12 +1407,12 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out,
 void t_swift_3_generator::generate_swift_service_client_async(ofstream& out,
                                                                       t_service* tservice) {
 
-  indent(out) << "public class " << tservice->get_name() << "AsyncClient";// : "
+  indent(out) << "public class " << tservice->get_name() << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
 
-  out << " : " << ((parent == NULL) ? "TAsyncClient" : parent->get_name() + "AsyncClient");
+  out << " : " << ((parent == NULL) ? "T" :  parent->get_name()) + "AsyncClient<Protocol, Factory>";
   out <<  " /* , " << tservice->get_name() << " */";
 
   block_open(out);
@@ -1438,9 +1442,9 @@ void t_swift_3_generator::generate_swift_service_server(ofstream& out,
   out << indent() << "typealias ProcessorHandlerDictionary = "
                   << "[String: (Int32, TProtocol, TProtocol, " << tservice->get_name() << ") throws -> Void]" << endl
       << endl
-      << indent() << "let service: " << tservice->get_name() << endl
+      << indent() << "public var service: " << tservice->get_name() << endl
       << endl
-      << indent() << "public init(service: " << tservice->get_name() << ")";
+      << indent() << "public required init(service: " << tservice->get_name() << ")";
   block_open(out);
   indent(out) << "self.service = service" << endl;
   block_close(out);
@@ -1547,6 +1551,8 @@ void t_swift_3_generator::generate_swift_service_client_recv_function_implementa
   indent(out);
   if (!tfunction->get_returntype()->is_void() || !tfunction->get_xceptions()->get_members().empty()) {
     out << "let result = ";
+  } else {
+    out << "_ = ";
   }
 
   string return_type_name = type_name(tfunction->get_returntype());
@@ -1720,8 +1726,8 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
 
     out << endl;
 
-    out << indent() << "let transport   = transportFactory.newTransport()" << endl
-        << indent() << "let proto = protocolFactory.newProtocol(on: transport)" << endl
+    out << indent() << "let transport   = factory.newTransport()" << endl
+        << indent() << "let proto = Protocol(on: transport)" << endl
         << endl;
 
     generate_swift_service_client_send_async_function_invocation(out, *f_iter);
@@ -1729,6 +1735,8 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
     out << endl;
 
     bool ret_is_void = (*f_iter)->get_returntype()->is_void();
+    bool is_oneway = (*f_iter)->is_oneway();
+
     string error_completion_call = ret_is_void ? "completion(error)" : "completion(nil, error)";
     indent(out) << "transport.flush";
     block_open(out);
@@ -1737,21 +1745,27 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
     block_open(out);
     out << indent() << error_completion_call << endl;
     block_close(out);
-    out << indent() << "do";
-    block_open(out);
-    indent(out);
-    if (!ret_is_void) {
-      out << "let result = ";
+
+    if (!is_oneway) {
+      out << indent() << "do";
+      block_open(out);
+      indent(out);
+      if (!ret_is_void) {
+        out << "let result = ";
+      }
+      out << "try self.recv_" << (*f_iter)->get_name() << "(on: proto)" << endl;
+
+      out << indent() << (ret_is_void ? "completion(nil)" : "completion(result, nil)") << endl;
+      block_close(out);
+
+      out << indent() << "catch let error";
+      block_open(out);
+      out << indent() << error_completion_call << endl;
+
+      block_close(out);
+    } else {
+      out << indent() << "completion(nil)" << endl;
     }
-    out << "try self.recv_" << (*f_iter)->get_name() << "(on: proto)" << endl;
-    out << indent() << (ret_is_void ? "completion(nil)" : "completion(result, nil)") << endl;
-    block_close(out);
-
-    out << indent() << "catch let error";
-    block_open(out);
-    out << indent() << error_completion_call << endl;
-
-    block_close(out);
 
     block_close(out);
 
@@ -1893,7 +1907,7 @@ void t_swift_3_generator::generate_swift_service_server_implementation(ofstream&
   block_close(out);
   out << indent() << "else";
   block_open(out);
-  out << indent() << "try inProtocol.skipType(.struct)" << endl
+  out << indent() << "try inProtocol.skip(type: .struct)" << endl
       << indent() << "try inProtocol.readMessageEnd()" << endl
       << indent() << "let ex = TApplicationError(error: .unknownMethod(methodName: messageName))" << endl
       << indent() << "try outProtocol.writeException(messageName: messageName, "
@@ -2173,11 +2187,11 @@ string t_swift_3_generator::async_function_signature(t_function* tfunction) {
   string response_string = "(";
   response_string += ((ttype->is_void()) ? "" : (type_name(ttype)) + "?");
   response_string += ((ttype->is_void()) ? "" : ", ");
-  response_string += "Error?) -> Void";
+  response_string += "Swift.Error?) -> Void";
   string result = "func " + tfunction->get_name();
   result += "(" + argument_list(tfunction->get_arglist(), "", false, false)
           + (targlist->get_members().size() ? ", " : "")
-          + "completion: " + response_string + ") throws";
+          + "completion: @escaping " + response_string + ") throws";
   return result;
 }
 
@@ -2303,4 +2317,6 @@ THRIFT_REGISTER_GENERATOR(
     "    log_unexpected:  Log every time an unexpected field ID or type is encountered.\n"
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
-    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n")
+    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n "
+    "    no_strict:       Initialize all struct fields with type defaults.  Use when target client/server"
+    "                     supports empty initialization with null required fields and doesn't properly initialize (i.e. python)")

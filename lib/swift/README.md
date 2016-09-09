@@ -70,7 +70,7 @@ do {
 - Eliminated Protocol Factories, They were only used in async clients and server implementations, where Generics provide a better alternative.
 - Swifty Errors, All `TError` types have a nested `ErrorCode` Enum as well as some extra flavor where needed.
 - Value typed everything.  `TTransport` operates on value typed `Data` rather than reference typed `NSData` or `UnsafeBufferPointer`s
-- Swift 3 Named protocols.  Swift 3 naming conventions suggest the elimination of redundant words that can be inferred from variable/function signatures.  eg.
+- Swift 3 Named protocols.  Swift 3 naming conventions suggest the elimination of redundant words that can be inferred from variable/function signatures.  This renaming is applied throughout the Swift 3 library converting most naming conventions used in the Swift2/Cocoa library to Swift 3-esque naming conventions. eg.
 ```swift
 func readString() throws -> String
 func writeString(_ val: String) throws
@@ -80,8 +80,8 @@ have been renamed to eliminate redundant words:
 func read() throws -> String
 func write(_ val: String) throws
 ```
-    This renaming is applied throughout the Swift 3 library converting most naming conventions used in the Swift2/Cocoa library to Swift 3-esque naming conventions.
-- Eliminated `THTTPTransport` that uses `NSURLConnection` due to it being deprecated and not available at all in Swift 3 for Linux.  `THTTPSessionTransport` from the Swift2/Cocoa library that uses `NSURLSession` has been renamed to `THTTPTransport` for this library and leverages `URLSession`, providing both synchrnounus (with semaphores) and asynchronous behavior.
+
+- Eliminated `THTTPTransport` that uses `NSURLConnection` due to it being deprecated and not available at all in Swift 3 for Linux.  `THTTPSessionTransport` from the Swift2/Cocoa library that uses `NSURLSession` has been renamed to `THTTPTransport` for this library and leverages `URLSession`, providing both synchronous (with semaphores) and asynchronous behavior.
 - Probably some More things I've missed here.
 
 ## Generator Notes

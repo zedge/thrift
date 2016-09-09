@@ -136,15 +136,15 @@ let logQueue = DispatchQueue(label: "log", qos: .background, attributes: .concur
 let pQueue = DispatchQueue(label: "log", qos: .userInitiated, attributes: .concurrent)
 
 
-class TPerfectServer<InProtocol: TProtocol, OutProtocol: TProtocol, Processor: TProcessor> {
+class TPerfectServer<InProtocol: TProtocol, OutProtocol: TProtocol> {
 
  private var server = HTTPServer()
- private var processor: Processor
+ private var processor: TProcessor
 
  init(address: String? = nil,
       path: String? = nil,
       port: Int,
-      processor: Processor,
+      processor: TProcessor,
       inProtocol: InProtocol.Type,
       outProtocol: OutProtocol.Type) throws {
 

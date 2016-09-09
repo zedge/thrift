@@ -130,7 +130,10 @@ func write(_ val: String) throws
 import PerfectLib
 import PerfectHTTP
 import PerfectHTTPServer
+ipmort Dispatch
 
+let logQueue = DispatchQueue(label: "log", qos: .background, attributes: .concurrent)
+let pQueue = DispatchQueue(label: "log", qos: .userInitiated, attributes: .concurrent)
 
 
 class TPerfectServer<InProtocol: TProtocol, OutProtocol: TProtocol, Processor: TProcessor> {

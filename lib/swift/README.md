@@ -109,10 +109,12 @@ func write(_ val: String) throws
 - [x] TFileTransport - A few variants using File handles and file descriptors.
 - [ ] HTTPServer - Currently there is no lightweight  HTTPServer implementation the Swift Standard Library, so other 3rd party alternatives are required and out of scope for the Thrift library.  Examples using Perfect will be provided.
 - [ ] Other (gz, etc)
+
 ##### Protocols
 - [x] TBinaryProtocol
 - [x] TCompactProtocol
 - [ ] TJSONProtocol - This will need to be implemented
+
 ##### Generator
 - [x] Code Complete Generator
 - [x] Async clients

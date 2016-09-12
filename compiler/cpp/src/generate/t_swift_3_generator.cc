@@ -129,6 +129,8 @@ public:
                                               bool is_result,
                                               bool is_private);
   void generate_swift_struct_reader(ofstream& out, t_struct* tstruct, bool is_private);
+  void generate_swift_union_reader(ofstream& out, t_struct* tstruct);
+
   void generate_swift_struct_writer(ofstream& out,t_struct* tstruct, bool is_private);
   void generate_swift_struct_result_writer(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_printable_extension(ofstream& out, t_struct* tstruct);
@@ -568,6 +570,9 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
     }
   }
 }
+
+
+
 /**
  * Generate the interface for a struct. Only properties and
  * init methods are included.
@@ -602,46 +607,67 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
       out << "/// " << (*d_iter) << endl;
     }
   }
-  string visibility = is_private ? "fileprivate" : "public";
-
-  out << indent() << visibility << " final class " << tstruct->get_name();
-
-  if (tstruct->is_xception()) {
-    out << " : Swift.Error"; // Error seems to be a common exception name in thrift
-  }
-
-  block_open(out);
 
   // properties
   const vector<t_field*>& members = tstruct->get_members();
   vector<t_field*>::const_iterator m_iter;
 
-  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-    out << endl;
-    // TODO: Defaults
-    // add swift docstring if available
-    string doc = (*m_iter)->get_doc();
-    if (doc != "") {
-      out << indent() << "/// " << doc;
+
+  if (tstruct->is_union()) {
+    // special, unions
+    out << indent() << "public enum " << tstruct->get_name();
+    block_open(out);
+    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+      out << endl;
+      // TODO: Defaults
+      // add swift docstring if available
+      string doc = (*m_iter)->get_doc();
+      if (doc != "") {
+        out << indent() << "/// " << doc;
+      }
+      out << indent() << "case "
+          << maybe_escape_identifier((*m_iter)->get_name()) << "(val: "
+          << type_name((*m_iter)->get_type(), false) << ")" << endl;
     }
-    out << indent() << declare_property(*m_iter, is_private) << endl;
-  }
+  } else {
+    // Normal structs
 
-  out << endl;
+    string visibility = is_private ? "fileprivate" : "public";
 
-  // init TODO: Remove, no need for generic init
+    out << indent() << visibility << " final class " << tstruct->get_name();
 
-  // indent(out) << visibility << " init() { }" << endl;
+    if (tstruct->is_xception()) {
+      out << " : Swift.Error"; // Error seems to be a common exception name in thrift
+    }
 
-  out << endl;
-  if (!struct_has_required_fields(tstruct)) {
-    indent(out) << visibility << " init() { }" << endl;
-  }
-  if (struct_has_required_fields(tstruct)) {
-    generate_swift_struct_init(out, tstruct, false, is_private);
-  }
-  if (struct_has_optional_fields(tstruct)) {
-    generate_swift_struct_init(out, tstruct, true, is_private);
+    block_open(out);
+    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+      out << endl;
+      // TODO: Defaults
+      // add swift docstring if available
+      string doc = (*m_iter)->get_doc();
+      if (doc != "") {
+        out << indent() << "/// " << doc;
+      }
+      out << indent() << declare_property(*m_iter, is_private) << endl;
+    }
+
+    out << endl;
+
+    // init TODO: Remove, no need for generic init
+
+    // indent(out) << visibility << " init() { }" << endl;
+
+    out << endl;
+    if (!struct_has_required_fields(tstruct)) {
+      indent(out) << visibility << " init() { }" << endl;
+    }
+    if (struct_has_required_fields(tstruct)) {
+      generate_swift_struct_init(out, tstruct, false, is_private);
+    }
+    if (struct_has_optional_fields(tstruct)) {
+      generate_swift_struct_init(out, tstruct, true, is_private);
+    }
   }
 
   block_close(out);
@@ -722,21 +748,29 @@ void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out
 
   block_open(out);
 
-
   const vector<t_field*>& members = tstruct->get_members();
   vector<t_field*>::const_iterator m_iter;
 
   if (!members.empty()) {
     indent(out) << "let prime = 31" << endl;
     indent(out) << "var result = 1" << endl;
-
-    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-      t_field* tfield = *m_iter;
-      string accessor = field_is_optional(tfield) ? "?." : ".";
-      string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
-      indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(tfield->get_name()) << accessor
-                  <<  "hashValue" << defaultor << ")" << endl;
+    if (!tstruct->is_union()) {
+      for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+        t_field* tfield = *m_iter;
+        string accessor = field_is_optional(tfield) ? "?." : ".";
+        string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
+        indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(tfield->get_name()) << accessor
+                    <<  "hashValue" << defaultor << ")" << endl;
+      }
+    } else {
+      indent(out) << "switch self {" << endl;
+      for (m_iter = members.begin(); m_iter != members.end(); m_iter++) {
+        t_field *tfield = *m_iter;
+        indent(out) << "case ." << tfield->get_name() << "(let val): result = prime &* val.hashValue" << endl;
+      }
+      indent(out) << "}" << endl << endl;
     }
+
 
     indent(out) << "return result" << endl;
   }
@@ -776,22 +810,35 @@ void t_swift_3_generator::generate_swift_struct_equatable_extension(ofstream& ou
   vector<t_field*>::const_iterator m_iter;
 
   if (members.size()) {
-
-    out << endl;
-
-    indent_up();
-
-    for (m_iter = members.begin(); m_iter != members.end();) {
-      t_field* tfield = *m_iter;
-      indent(out) << "(lhs." << maybe_escape_identifier(tfield->get_name())
-                  << " == rhs." << maybe_escape_identifier(tfield->get_name()) << ")";
-      if (++m_iter != members.end()) {
-        out << " &&";
-      }
+    if (!tstruct->is_union()) {
       out << endl;
-    }
+      indent_up();
 
-    indent_down();
+      for (m_iter = members.begin(); m_iter != members.end();) {
+        t_field* tfield = *m_iter;
+        indent(out) << "(lhs." << maybe_escape_identifier(tfield->get_name())
+                    << " == rhs." << maybe_escape_identifier(tfield->get_name()) << ")";
+        if (++m_iter != members.end()) {
+          out << " &&";
+        }
+        out << endl;
+      }
+
+      indent_down();
+    } else {
+      block_open(out);
+      indent(out) << "switch (lhs, rhs) {" << endl;
+      for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+        t_field* tfield = *m_iter;
+        indent(out) << "case (." << tfield->get_name() << "(let lval), ."
+                    << tfield->get_name() << "(let rval)): return lval == rval"
+                    << endl;
+      }
+      indent(out) << "default: return false" << endl;
+      indent(out) << "}" << endl;
+      indent_down();
+      indent(out) << "}()" << endl;
+    }
 
   }
   else {
@@ -829,6 +876,7 @@ void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out,
 
   out << endl << endl;
 }
+
 
 /**
  * Generate the TStruct protocol implementation.
@@ -873,18 +921,91 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
       << tstruct->get_name() << "\" }" << endl << endl;
 
 
-  generate_swift_struct_reader(out, tstruct, is_private);
-  // Dont need writer, Reflection handles in library
-  // if (is_result) {
-  //   generate_swift_struct_result_writer(out, tstruct);
-  // }
-  // else {
-  //   generate_swift_struct_writer(out, tstruct, is_private);
-  // }
-
+  if (tstruct->is_union()) {
+    generate_swift_union_reader(out, tstruct);
+  } else {
+    generate_swift_struct_reader(out, tstruct, is_private);
+  }
   block_close(out);
 
   out << endl;
+}
+
+void t_swift_3_generator::generate_swift_union_reader(ofstream& out,
+                                                     t_struct* tstruct) {
+  indent(out) << "public static func read(from proto: TProtocol) throws -> "
+              << tstruct->get_name();
+  block_open(out);
+  indent(out) << "_ = try proto.readStructBegin()" << endl;
+
+  indent(out) << "var ret: " << tstruct->get_name() << "?";
+  out << endl;
+  indent(out) << "fields: while true";
+  block_open(out);
+  out << endl;
+  indent(out) << "let (_, fieldType, fieldID) = try proto.readFieldBegin()" << endl << endl;
+  indent(out) << "switch (fieldID, fieldType)";
+  block_open(out);
+  indent(out) << "case (_, .stop):            break fields" << endl;
+
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator f_iter;
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    indent(out) << "case (" << (*f_iter)->get_key() << ", " << type_to_enum((*f_iter)->get_type()) << "):";// << endl;
+    string padding = "";
+
+    t_type* type = get_true_type((*f_iter)->get_type());
+    if (type->is_base_type()) {
+      t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
+      switch (tbase) {
+        case t_base_type::TYPE_STRING:
+        case t_base_type::TYPE_DOUBLE:
+          padding = "           ";
+          break;
+
+        case t_base_type::TYPE_BOOL:
+        case t_base_type::TYPE_I8:
+          padding = "            ";
+          break;
+        case t_base_type::TYPE_I16:
+        case t_base_type::TYPE_I32:
+        case t_base_type::TYPE_I64:
+          padding = "             ";
+          break;
+        default: break;
+      }
+    } else if (type->is_enum() || type->is_set() || type->is_map()) {
+      padding = "             ";
+    } else if (type->is_struct() || type->is_xception()) {
+      padding = "           ";
+    } else if (type->is_list()) {
+      padding = "            ";
+    }
+
+    // indent_up();
+    indent(out) << padding << "ret = " << tstruct->get_name() << "."
+                << (*f_iter)->get_name() << "(val: " << "try "
+                << type_name((*f_iter)->get_type(), false, false)
+                << ".read(from: proto))" << endl;
+  }
+
+  indent(out) << "case let (_, unknownType):  try proto.skip(type: unknownType)" << endl;
+
+  block_close(out);
+  indent(out) << "try proto.readFieldEnd()" << endl;
+
+  block_close(out);
+  out << endl;
+  indent(out) << "if let ret = ret";
+  block_open(out);
+  indent(out) << "return ret" << endl;
+  block_close(out);
+  out << endl;
+  indent(out) << "throw TProtocolError(error: .unknown, message: \"Missing required value for type: "
+              << tstruct->get_name() << "\")";
+  block_close(out);
+  out << endl;
+
 }
 
 /**
@@ -898,6 +1019,7 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
 void t_swift_3_generator::generate_swift_struct_reader(ofstream& out,
                                                      t_struct* tstruct,
                                                      bool is_private) {
+
 
   string visibility = is_private ? "fileprivate" : "public";
 
@@ -1143,6 +1265,9 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
 
   // Allow use of debugDescription so the app can add description via a cateogory/extension
 
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator f_iter;
+
   indent(out) << "extension " << tstruct->get_name() << " : "
               << (debug_descriptions_ ? "CustomDebugStringConvertible" : "CustomStringConvertible");
 
@@ -1154,20 +1279,31 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
 
   block_open(out);
 
-  indent(out) << "var desc = \"" << tstruct->get_name() << "(\"" << endl;
+  indent(out) << "var desc = \"" << tstruct->get_name();
 
-  const vector<t_field*>& fields = tstruct->get_members();
-  vector<t_field*>::const_iterator f_iter;
-
-  for (f_iter = fields.begin(); f_iter != fields.end();) {
-    indent(out) << "desc += \"" << (*f_iter)->get_name()
-                << "=\\(self." << maybe_escape_identifier((*f_iter)->get_name()) << ")";
-    if (++f_iter != fields.end()) {
-      out << ", ";
+  if (!tstruct->is_union()) {
+    out << "(\"" << endl;
+    for (f_iter = fields.begin(); f_iter != fields.end();) {
+      indent(out) << "desc += \"" << (*f_iter)->get_name()
+                  << "=\\(self." << maybe_escape_identifier((*f_iter)->get_name()) << ")";
+      if (++f_iter != fields.end()) {
+        out << ", ";
+      }
+      out << "\"" << endl;
     }
-    out << "\"" << endl;
+  } else {
+    out << ".\"" << endl;
+    indent(out) << "switch self {" << endl;
+    for (f_iter = fields.begin(); f_iter != fields.end();f_iter++) {
+      indent(out) << "case ." << (*f_iter)->get_name() << "(let val): "
+                  << "desc += \"" << (*f_iter)->get_name() << "(val: \\(val))\""
+                  << endl;
+    }
+    indent(out) << "}" << endl;
+
+
   }
-  indent(out) << "desc += \")\"" << endl;
+
   indent(out) << "return desc" << endl;
 
   block_close(out);

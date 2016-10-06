@@ -2421,7 +2421,7 @@ string t_swift_3_generator::type_to_enum(t_type* type, bool qualified) {
     case t_base_type::TYPE_BOOL:
       return result + "bool";
     case t_base_type::TYPE_I8:
-      return result + "byte";
+      return result + "i8";
     case t_base_type::TYPE_I16:
       return result + "i16";
     case t_base_type::TYPE_I32:

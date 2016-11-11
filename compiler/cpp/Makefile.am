@@ -192,6 +192,7 @@ EXTRA_DIST = \
              coding_standards.md \
              README.md \
              CMakeLists.txt \
+             test \
              $(WINDOWS_DIST)
 
 clean-local:

@@ -177,6 +177,8 @@ public:
   string declare_property(t_field* tfield, bool is_private);
   string function_signature(t_function* tfunction);
   string async_function_signature(t_function* tfunction);
+  void function_docstring(ofstream& out, t_function* tfunction);
+  void async_function_docstring(ofstream& out, t_function* tfunction);
   string argument_list(t_struct* tstruct, string protocol_name, bool is_internal, bool default_val);
   string type_to_enum(t_type* ttype, bool qualified=false);
   string maybe_escape_identifier(const string& identifier);
@@ -555,7 +557,9 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
 
     std::string::size_type pos = 0;
     std::string::size_type prev = 0;
-    while ((pos = doc.find("\n", prev)) != std::string::npos)
+    while (((pos = doc.find("\n", prev)) != std::string::npos)
+        || ((pos = doc.find("\r", prev)) != std::string::npos)
+        || ((pos = doc.find("\r\n", prev)) != std::string::npos))
     {
         strings.push_back(doc.substr(prev, pos - prev));
         prev = pos + 1;
@@ -566,7 +570,9 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
 
     vector<string>::const_iterator d_iter;
     for (d_iter = strings.begin(); d_iter != strings.end(); ++d_iter) {
-      out << indent() << "/// " << (*d_iter) << endl;
+      if ((*d_iter) != "") {
+        out << indent() << "/// " << (*d_iter) << endl;
+      }
     }
   }
 }
@@ -588,25 +594,8 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
 
 
   string doc = tstruct->get_doc();
-  if (doc != "") {
-    std::vector<std::string> strings;
+  generate_docstring(out, doc);
 
-    std::string::size_type pos = 0;
-    std::string::size_type prev = 0;
-    while ((pos = doc.find("\n", prev)) != std::string::npos)
-    {
-        strings.push_back(doc.substr(prev, pos - prev));
-        prev = pos + 1;
-    }
-
-    // To get the last substring (or only, if delimiter is not found)
-    strings.push_back(doc.substr(prev));
-
-    vector<string>::const_iterator d_iter;
-    for (d_iter = strings.begin(); d_iter != strings.end(); ++d_iter) {
-      out << "/// " << (*d_iter) << endl;
-    }
-  }
 
   // properties
   const vector<t_field*>& members = tstruct->get_members();
@@ -619,15 +608,9 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
     block_open(out);
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
       out << endl;
-      // TODO: Defaults
-      // add swift docstring if available
       string doc = (*m_iter)->get_doc();
-      if (doc != "") {
-        out << indent() << "/// " << doc;
-      }
-      out << indent() << "case "
-          << maybe_escape_identifier((*m_iter)->get_name()) << "(val: "
-          << type_name((*m_iter)->get_type(), false) << ")" << endl;
+      generate_docstring(out, doc);
+
     }
   } else {
     // Normal structs
@@ -644,11 +627,10 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
       out << endl;
       // TODO: Defaults
-      // add swift docstring if available
+
       string doc = (*m_iter)->get_doc();
-      if (doc != "") {
-        out << indent() << "/// " << doc;
-      }
+      generate_docstring(out, doc);
+
       out << indent() << declare_property(*m_iter, is_private) << endl;
     }
 
@@ -1426,27 +1408,23 @@ void t_swift_3_generator::generate_function_helpers(t_service *tservice, t_funct
  */
 void t_swift_3_generator::generate_swift_service_protocol(ofstream& out, t_service* tservice) {
 
+  string doc = tservice->get_doc();
+  generate_docstring(out, doc);
+
   indent(out) << "public protocol " << tservice->get_name();
   t_service* parent = tservice->get_extends();
   if (parent != NULL) {
     out << " : " << parent->get_name();
   }
   block_open(out);
+  out << endl;
 
   vector<t_function*> functions = tservice->get_functions();
   vector<t_function*>::iterator f_iter;
 
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
-    out << endl;
-
-    indent(out) << function_signature(*f_iter) << "  // exceptions: ";
-    t_struct* xs = (*f_iter)->get_xceptions();
-    const vector<t_field*>& xceptions = xs->get_members();
-    vector<t_field*>::const_iterator x_iter;
-    for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-      out << type_name((*x_iter)->get_type()) + ", ";
-    }
-    out << endl;
+    function_docstring(out, *f_iter);
+    indent(out) << function_signature(*f_iter) << endl << endl;
   }
 
   block_close(out);
@@ -1461,17 +1439,20 @@ void t_swift_3_generator::generate_swift_service_protocol(ofstream& out, t_servi
  */
 void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t_service* tservice) {
 
+  string doc = tservice->get_doc();
+  generate_docstring(out, doc);
+
   indent(out) << "public protocol " << tservice->get_name() << "Async";
 
   block_open(out);
+  out << endl;
 
   vector<t_function*> functions = tservice->get_functions();
   vector<t_function*>::iterator f_iter;
 
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
-    out << endl;
-    indent(out) << async_function_signature(*f_iter) << endl;
-    out << endl;
+    async_function_docstring(out, *f_iter);
+    indent(out) << async_function_signature(*f_iter) << endl << endl;
   }
 
   block_close(out);
@@ -2309,6 +2290,109 @@ string t_swift_3_generator::function_signature(t_function* tfunction) {
   }
 
   return result;
+}
+
+/**
+ * Renders a function signature
+ *
+ * @param tfunction Function definition
+ * @return String of rendered function definition
+ */
+void t_swift_3_generator::function_docstring(ofstream& out, t_function* tfunction) {
+
+    // Generate docstring with following format:
+    // /// <Description>
+    // /// <empty line>
+    // /// - Parameters:
+    // ///   - <parameter>: <parameter docstring>
+    // /// - Returns: <return type> (Thrift has no docstring on return val)
+    // /// - Throws: <exception types>
+
+    // Description
+    string doc = tfunction->get_doc();
+    generate_docstring(out, doc);
+    indent(out) << "///" << endl;
+
+    // Parameters
+    const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
+    vector<t_field*>::const_iterator f_iter;
+    if (!fields.empty()) {
+      indent(out) << "/// - Parameters:" << endl;
+      for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+        indent(out) << "///   - " << (*f_iter)->get_name() << ": ";
+        string doc = (*f_iter)->get_doc();
+        if (!doc.empty() && doc[doc.length()-1] == '\n') {
+            doc.erase(doc.length()-1);
+        }
+        out << doc << endl;
+      }
+    }
+
+    // Returns
+    t_type* ttype = tfunction->get_returntype();
+    if (!ttype->is_void()) {
+      indent(out) << "/// - Returns: " << type_name(ttype) << endl;
+    }
+
+    // Throws
+    indent(out) << "/// - Throws: ";
+    t_struct* xs = tfunction->get_xceptions();
+    const vector<t_field*>& xceptions = xs->get_members();
+    vector<t_field*>::const_iterator x_iter;
+    for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
+      out << type_name((*x_iter)->get_type());
+      if (*x_iter != xceptions.back()) {
+        out << ", ";
+      }    }
+    out << endl;
+}
+
+/**
+ * Renders a function signature
+ *
+ * @param tfunction Function definition
+ * @return String of rendered function definition
+ */
+void t_swift_3_generator::async_function_docstring(ofstream& out, t_function* tfunction) {
+
+    // Generate docstring with following format:
+    // /// <Description>
+    // /// <empty line>
+    // /// - Parameters:
+    // ///   - <parameter>: <parameter docstring>
+    // ///   - callback: <callback types>
+    // Description
+    string doc = tfunction->get_doc();
+    generate_docstring(out, doc);
+    indent(out) << "///" << endl;
+
+    // Parameters
+    const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
+    vector<t_field*>::const_iterator f_iter;
+    if (!fields.empty()) {
+      indent(out) << "/// - Parameters:" << endl;
+      for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+        indent(out) << "///   - " << (*f_iter)->get_name() << ": ";
+        string doc = (*f_iter)->get_doc();
+        if (!doc.empty() && doc[doc.length()-1] == '\n') {
+            doc.erase(doc.length()-1);
+        }
+        out << doc << endl;
+      }
+    }
+
+    // completion
+    indent(out) << "///   - completion: Block with return and exceptions: ";
+    t_struct* xs = tfunction->get_xceptions();
+    const vector<t_field*>& xceptions = xs->get_members();
+    vector<t_field*>::const_iterator x_iter;
+    for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
+      out << type_name((*x_iter)->get_type());
+      if (*x_iter != xceptions.back()) {
+        out << ", ";
+      }
+    }
+    out << endl;
 }
 
 /**

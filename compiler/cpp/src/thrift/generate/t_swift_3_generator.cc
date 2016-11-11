@@ -579,7 +579,7 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
  *
  * @param tstruct The struct definition
  * @param is_private
- *                Is the struct open or private
+ *                Is the struct public or private
  */
 void t_swift_3_generator::generate_swift_struct(ofstream& out,
                                               t_struct* tstruct,
@@ -632,7 +632,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
   } else {
     // Normal structs
 
-    string visibility = is_private ? "fileprivate" : "open";
+    string visibility = is_private ? "fileprivate" : "public";
 
     out << indent() << visibility << " final class " << tstruct->get_name();
 
@@ -681,14 +681,14 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
  * @param tstruct The structure definition
  * @param all     Generate init with all or just required properties
  * @param is_private
- *                Is the initializer open or private
+ *                Is the initializer public or private
  */
 void t_swift_3_generator::generate_swift_struct_init(ofstream& out,
                                                    t_struct* tstruct,
                                                    bool all,
                                                    bool is_private) {
 
-  string visibility = is_private ? "fileprivate" : "open";
+  string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " init(";
 

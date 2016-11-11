@@ -579,7 +579,7 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
  *
  * @param tstruct The struct definition
  * @param is_private
- *                Is the struct public or private
+ *                Is the struct open or private
  */
 void t_swift_3_generator::generate_swift_struct(ofstream& out,
                                               t_struct* tstruct,
@@ -632,7 +632,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
   } else {
     // Normal structs
 
-    string visibility = is_private ? "fileprivate" : "public";
+    string visibility = is_private ? "fileprivate" : "open";
 
     out << indent() << visibility << " final class " << tstruct->get_name();
 
@@ -681,14 +681,14 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
  * @param tstruct The structure definition
  * @param all     Generate init with all or just required properties
  * @param is_private
- *                Is the initializer public or private
+ *                Is the initializer open or private
  */
 void t_swift_3_generator::generate_swift_struct_init(ofstream& out,
                                                    t_struct* tstruct,
                                                    bool all,
                                                    bool is_private) {
 
-  string visibility = is_private ? "fileprivate" : "public";
+  string visibility = is_private ? "fileprivate" : "open";
 
   indent(out) << visibility << " init(";
 
@@ -1487,7 +1487,7 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
 void t_swift_3_generator::generate_swift_service_client(ofstream& out,
                                                                 t_service* tservice) {
 
-  indent(out) << "public class " << tservice->get_name() << "Client";// : "
+  indent(out) << "open class " << tservice->get_name() << "Client";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
@@ -1543,7 +1543,7 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out,
 void t_swift_3_generator::generate_swift_service_client_async(ofstream& out,
                                                                       t_service* tservice) {
 
-  indent(out) << "public class " << tservice->get_name() << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
+  indent(out) << "open class " << tservice->get_name() << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
@@ -1569,7 +1569,7 @@ void t_swift_3_generator::generate_swift_service_client_async(ofstream& out,
 void t_swift_3_generator::generate_swift_service_server(ofstream& out,
                                                                 t_service* tservice) {
 
-  indent(out) << "public class " << tservice->get_name() << "Processor /* " << tservice->get_name() << " */";
+  indent(out) << "open class " << tservice->get_name() << "Processor /* " << tservice->get_name() << " */";
 
   block_open(out);
 

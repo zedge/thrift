@@ -1881,7 +1881,7 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
       }
       out << "try self.recv_" << (*f_iter)->get_name() << "(on: proto)" << endl;
 
-      out << indent() << (ret_is_void ? "completion(.success)" : "completion(.success(result))") << endl;
+      out << indent() << (ret_is_void ? "completion(.success())" : "completion(.success(result))") << endl;
       indent_down();
       out << indent() << "} catch let error {" << endl;
       indent_up();
@@ -1889,7 +1889,7 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
 
       block_close(out);
     } else {
-      out << indent() << "completion(.success)" << endl;
+      out << indent() << "completion(.success())" << endl;
     }
 
     block_close(out);

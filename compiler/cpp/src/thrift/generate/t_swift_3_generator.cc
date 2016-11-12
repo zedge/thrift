@@ -1847,14 +1847,23 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
         << indent() << "let proto = Protocol(on: transport)" << endl
         << endl;
 
+    out << indent() << "do";
+    block_open(out);
+
     generate_swift_service_client_send_async_function_invocation(out, *f_iter);
+
+    indent_down();
+    out << indent() << "} catch let error {" << endl;
+    indent_up();
+    out << indent() << "completion(.error(error))" << endl;
+    block_close(out);
 
     out << endl;
 
     bool ret_is_void = (*f_iter)->get_returntype()->is_void();
     bool is_oneway = (*f_iter)->is_oneway();
 
-    string error_completion_call = ret_is_void ? "completion(error)" : "completion(nil, error)";
+    string error_completion_call = "completion(.error(error))";
     indent(out) << "transport.flush";
     block_open(out);
     out << indent() << "(trans, error) in" << endl << endl;
@@ -1872,16 +1881,15 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
       }
       out << "try self.recv_" << (*f_iter)->get_name() << "(on: proto)" << endl;
 
-      out << indent() << (ret_is_void ? "completion(nil)" : "completion(result, nil)") << endl;
-      block_close(out);
-
-      out << indent() << "catch let error";
-      block_open(out);
+      out << indent() << (ret_is_void ? "completion(.success)" : "completion(.success(result))") << endl;
+      indent_down();
+      out << indent() << "} catch let error {" << endl;
+      indent_up();
       out << indent() << error_completion_call << endl;
 
       block_close(out);
     } else {
-      out << indent() << "completion(nil)" << endl;
+      out << indent() << "completion(.success)" << endl;
     }
 
     block_close(out);
@@ -2404,14 +2412,17 @@ void t_swift_3_generator::async_function_docstring(ofstream& out, t_function* tf
 string t_swift_3_generator::async_function_signature(t_function* tfunction) {
   t_type* ttype = tfunction->get_returntype();
   t_struct* targlist = tfunction->get_arglist();
-  string response_string = "(";
-  response_string += ((ttype->is_void()) ? "" : (type_name(ttype)) + "?");
-  response_string += ((ttype->is_void()) ? "" : ", ");
-  response_string += "Swift.Error?) -> Void";
+  string response_string = "(TAsyncResult<";
+  response_string += (ttype->is_void()) ? "Void" : type_name(ttype);
+  response_string += ">) -> Void";
+  // response_string += ((ttype->is_void()) ? "" : (type_name(ttype)) + "?");
+  // response_string += ((ttype->is_void()) ? "" : ", ");
+  // response_string += "Swift.Error?) -> Void";
+
   string result = "func " + tfunction->get_name();
   result += "(" + argument_list(tfunction->get_arglist(), "", false, false)
           + (targlist->get_members().size() ? ", " : "")
-          + "completion: @escaping " + response_string + ") throws";
+          + "completion: @escaping " + response_string + ")";
   return result;
 }
 

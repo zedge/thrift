@@ -42,7 +42,7 @@ open class TAsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory> {
 }
 
 
-public enum TAsyncResult<T : TSerializable> {
+public enum TAsyncResult<T> {
   case success(T)
   case error(Swift.Error)
   

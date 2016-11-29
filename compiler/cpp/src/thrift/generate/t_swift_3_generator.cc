@@ -95,12 +95,12 @@ public:
   void generate_xception(t_struct* txception);
   void generate_service(t_service* tservice);
 
-  void print_const_value(ostream& out,
-                         string name,
-                         t_type* type,
-                         t_const_value* value,
-                         bool defval = false,
-                         bool is_property = false);
+  // void print_const_value(ostream& out,
+  //                        string name,
+  //                        t_type* type,
+  //                        t_const_value* value,
+  //                        bool defval = false,
+  //                        bool is_property = false);
   void render_const_value(ostream& out,
                           t_type* type,
                           t_const_value* value);
@@ -186,6 +186,8 @@ public:
   string enum_const_name(string enum_identifier);
   void populate_reserved_words();
   void generate_docstring(ofstream& out, string& doc);
+
+
 
 private:
 
@@ -279,106 +281,14 @@ void t_swift_3_generator::init_generator() {
  * is NOT performed in this function as it is always run beforehand using the
  * validate_types method in main.cc
  */
-void t_swift_3_generator::print_const_value(ostream& out,
-                                            string name,
-                                            t_type* type,
-                                            t_const_value* value,
-                                            bool defval,
-                                            bool is_property) {
-  // type = get_true_type(type);
+// void t_swift_3_generator::print_const_value(ostream& out,
+//                                             string name,
+//                                             t_type* type,
+//                                             t_const_value* value,
+//                                             bool defval,
+//                                             bool is_property) {
 
-  // if (type->is_base_type()) {
-  //   string v2 = render_const_value(out, type, value);
-  //   indent(out);
-  //   if (defval)
-  //     out << type_name(type) << " ";
-  //   out << name << " = " << v2 << ";" << endl << endl;
-  // } else if (type->is_enum()) {
-  //   indent(out);
-  //   if (defval)
-  //     out << type_name(type) << " ";
-  //   out << name << " = " << render_const_value(out, type, value) << ";" << endl << endl;
-  // } else if (type->is_struct() || type->is_xception()) {
-  //   indent(out);
-  //   const vector<t_field*>& fields = ((t_struct*)type)->get_members();
-  //   vector<t_field*>::const_iterator f_iter;
-  //   const map<t_const_value*, t_const_value*>& val = value->get_map();
-  //   map<t_const_value*, t_const_value*>::const_iterator v_iter;
-  //   if (defval)
-  //     out << type_name(type) << " ";
-  //   out << name << " = [" << type_name(type, true) << " new];"
-  //       << endl;
-  //   for (v_iter = val.begin(); v_iter != val.end(); ++v_iter) {
-  //     t_type* field_type = NULL;
-  //     for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-  //       if ((*f_iter)->get_name() == v_iter->first->get_string()) {
-  //         field_type = (*f_iter)->get_type();
-  //       }
-  //     }
-  //     if (field_type == NULL) {
-  //       throw "type error: " + type->get_name() + " has no field " + v_iter->first->get_string();
-  //     }
-  //     string val = render_const_value(out, field_type, v_iter->second);
-  //     std::string cap_name = capitalize(v_iter->first->get_string());
-  //     indent(out) << "[" << name << " set" << cap_name << ":" << val << "];" << endl;
-  //   }
-  // } else if (type->is_map()) {
-  //   ostringstream mapout;
-  //   indent(mapout);
-  //   t_type* ktype = ((t_map*)type)->get_key_type();
-  //   t_type* vtype = ((t_map*)type)->get_val_type();
-  //   const map<t_const_value*, t_const_value*>& val = value->get_map();
-  //   map<t_const_value*, t_const_value*>::const_iterator v_iter;
-  //   if (defval)
-  //     mapout << type_name(type) << " ";
-  //   mapout << name << " = @{";
-  //   for (v_iter = val.begin(); v_iter != val.end();) {
-  //     mapout << render_const_value(out, ktype, v_iter->first, true) << ": "
-  //         << render_const_value(out, vtype, v_iter->second, true);
-  //     if (++v_iter != val.end()) {
-  //       mapout << ", ";
-  //     }
-  //   }
-  //   mapout << "}";
-  //   out << mapout.str();
-  // } else if (type->is_list()) {
-  //   ostringstream listout;
-  //   indent(listout);
-  //   t_type* etype = ((t_list*)type)->get_elem_type();
-  //   const vector<t_const_value*>& val = value->get_list();
-  //   vector<t_const_value*>::const_iterator v_iter;
-  //   if (defval)
-  //     listout << type_name(type) << " ";
-  //   listout << name << " = @[";
-  //   for (v_iter = val.begin(); v_iter != val.end();) {
-  //     listout << render_const_value(out, etype, *v_iter, true);
-  //     if (++v_iter != val.end()) {
-  //       listout << ", ";
-  //     }
-  //   }
-  //   listout << "]";
-  //   out << listout.str();
-  // } else if (type->is_set()) {
-  //   ostringstream setout;
-  //   indent(setout);
-  //   t_type* etype = ((t_set*)type)->get_elem_type();
-  //   const vector<t_const_value*>& val = value->get_list();
-  //   vector<t_const_value*>::const_iterator v_iter;
-  //   if (defval)
-  //     setout << type_name(type) << " ";
-  //   setout << name << " = [NSSet setWithArray:@[";
-  //   for (v_iter = val.begin(); v_iter != val.end();) {
-  //     setout << render_const_value(out, etype, *v_iter, true);
-  //     if (++v_iter != val.end()) {
-  //       setout << ", ";
-  //     }
-  //   }
-  //   setout << "]]";
-  //   out << setout.str();
-  // } else {
-  //   throw "compiler error: no const of type " + type->get_name();
-  // }
-}
+// }
 
 /**
  * Prints standard Cocoa imports
@@ -550,8 +460,7 @@ void t_swift_3_generator::generate_xception(t_struct* txception) {
   generate_swift_struct_implementation(f_impl_, txception, false, false);
 }
 
-void t_swift_3_generator::generate_docstring(ofstream& out,
-                                             string& doc) {
+void t_swift_3_generator::generate_docstring(ofstream& out, string& doc) {
   if (doc != "") {
     std::vector<std::string> strings;
 
@@ -587,10 +496,7 @@ void t_swift_3_generator::generate_docstring(ofstream& out,
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct(ofstream& out,
-                                              t_struct* tstruct,
-                                              bool is_private,
-                                              bool is_result) {
+void t_swift_3_generator::generate_swift_struct(ofstream& out, t_struct* tstruct, bool is_private, bool is_result) {
 
 
   string doc = tstruct->get_doc();
@@ -610,7 +516,9 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
       out << endl;
       string doc = (*m_iter)->get_doc();
       generate_docstring(out, doc);
-
+      out << indent() << "case "
+          << maybe_escape_identifier((*m_iter)->get_name()) << "(val: "
+          << type_name((*m_iter)->get_type(), false) << ")" << endl;
     }
   } else {
     // Normal structs
@@ -665,10 +573,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out,
  * @param is_private
  *                Is the initializer public or private
  */
-void t_swift_3_generator::generate_swift_struct_init(ofstream& out,
-                                                   t_struct* tstruct,
-                                                   bool all,
-                                                   bool is_private) {
+void t_swift_3_generator::generate_swift_struct_init(ofstream& out, t_struct* tstruct, bool all, bool is_private) {
 
   string visibility = is_private ? "fileprivate" : "public";
 
@@ -714,9 +619,7 @@ void t_swift_3_generator::generate_swift_struct_init(ofstream& out,
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out,
-                                                                 t_struct* tstruct,
-                                                                 bool is_private) {
+void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out, t_struct* tstruct, bool is_private) {
 
   string visibility = is_private ? "fileprivate" : "public";
 
@@ -776,9 +679,7 @@ void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct_equatable_extension(ofstream& out,
-                                                                  t_struct* tstruct,
-                                                                  bool is_private) {
+void t_swift_3_generator::generate_swift_struct_equatable_extension(ofstream& out, t_struct* tstruct, bool is_private) {
 
   string visibility = is_private ? "fileprivate" : "public";
 
@@ -842,10 +743,7 @@ void t_swift_3_generator::generate_swift_struct_equatable_extension(ofstream& ou
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out,
-                                                             t_struct* tstruct,
-                                                             bool is_result,
-                                                             bool is_private) {
+void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out, t_struct* tstruct, bool is_result, bool is_private) {
 
   generate_swift_struct_equatable_extension(out, tstruct, is_private);
 
@@ -869,10 +767,7 @@ void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out,
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
-                                                               t_struct* tstruct,
-                                                               bool is_result,
-                                                               bool is_private) {
+void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out, t_struct* tstruct, bool is_result, bool is_private) {
 
   indent(out) << "extension " << tstruct->get_name() << " : TStruct";
 
@@ -913,8 +808,7 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out,
   out << endl;
 }
 
-void t_swift_3_generator::generate_swift_union_reader(ofstream& out,
-                                                     t_struct* tstruct) {
+void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* tstruct) {
   indent(out) << "public static func read(from proto: TProtocol) throws -> "
               << tstruct->get_name();
   block_open(out);
@@ -998,9 +892,7 @@ void t_swift_3_generator::generate_swift_union_reader(ofstream& out,
  * @param is_private
  *                Is the struct public or private
  */
-void t_swift_3_generator::generate_swift_struct_reader(ofstream& out,
-                                                     t_struct* tstruct,
-                                                     bool is_private) {
+void t_swift_3_generator::generate_swift_struct_reader(ofstream& out, t_struct* tstruct, bool is_private) {
 
 
   string visibility = is_private ? "fileprivate" : "public";
@@ -1127,116 +1019,6 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out,
   out << endl;
 }
 
-/**
- * Generates a function to write a struct to
- * a protocol. (TStruct compliance)
- *
- * @param tstruct The structure definition
- * @param is_private
- *                Is the struct public or private
- */
-// DEPRECATED: Handled in Library
-// void t_swift_3_generator::generate_swift_struct_writer(ofstream& out,
-//                                                      t_struct* tstruct,
-//                                                      bool is_private) {
-
-//   string visibility = is_private ? "private" : "public";
-
-//   indent(out) << visibility << " func write(to proto: TProtocol) throws";
-
-//   block_open(out);
-
-//   out << endl;
-
-//   string name = tstruct->get_name();
-//   const vector<t_field*>& fields = tstruct->get_members();
-//   vector<t_field*>::const_iterator f_iter;
-
-//   indent(out) << "try proto.writeStructBegin(name: \"" << name << "\")" << endl;
-
-//   out << endl;
-
-//   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-//     t_field *tfield = *f_iter;
-
-//     bool optional = field_is_optional(tfield);
-//     if (optional) {
-//       indent(out) << "if let " << maybe_escape_identifier(tfield->get_name())
-//                   << " = __value." << maybe_escape_identifier(tfield->get_name());
-//       block_open(out);
-//     }
-
-//     indent(out) << "try proto.writeFieldValue("
-//                 << (optional ? "" : "__value.") << maybe_escape_identifier(tfield->get_name()) << ", "
-//                 << "name: \"" << tfield->get_name() << "\", "
-//                 << "type: " << type_to_enum(tfield->get_type()) << ", "
-//                 << "id: " << tfield->get_key() << ")" << endl;
-
-//     if (optional) {
-//       block_close(out);
-//     }
-
-//     out << endl;
-//   }
-
-//   indent(out) << "try __proto.writeFieldStop()" << endl << endl;
-
-//   indent(out) << "try __proto.writeStructEnd()" << endl;
-
-//   block_close(out);
-
-//   out << endl;
-// }
-
-/**
- * Generates a function to read a struct from
- * from a protocol. (TStruct compliance)
- *
- * This is specifically a function result. Only
- * the first available field is written.
- *
- * @param tstruct The structure definition
- */
-// DEPRECATED: Handled in library
-// void t_swift_3_generator::generate_swift_struct_result_writer(ofstream& out, t_struct* tstruct) {
-
-//   indent(out) << "private static func writeValue(__value: " << tstruct->get_name() << ", toProtocol __proto: TProtocol) throws";
-
-//   block_open(out);
-
-//   out << endl;
-
-//   string name = tstruct->get_name();
-//   const vector<t_field*>& fields = tstruct->get_members();
-//   vector<t_field*>::const_iterator f_iter;
-
-//   indent(out) << "try __proto.writeStructBeginWithName(\"" << name << "\")" << endl;
-
-//   out << endl;
-
-//   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-//     t_field *tfield = *f_iter;
-
-//     indent(out) << "if let result = __value." << (*f_iter)->get_name();
-
-//     block_open(out);
-
-//     indent(out) << "try __proto.writeFieldValue(result, "
-//                 << "name: \"" << tfield->get_name() << "\", "
-//                 << "type: " << type_to_enum(tfield->get_type()) << ", "
-//                 << "id: " << tfield->get_key() << ")" << endl;
-
-//     block_close(out);
-//   }
-//   // Write the struct map
-//   indent(out) << "try __proto.writeFieldStop()" << endl << endl;
-
-//   indent(out) << "try __proto.writeStructEnd()" << endl;
-
-//   block_close(out);
-
-//   out << endl;
-// }
 
 /**
  * Generates a description method for the given struct
@@ -1465,8 +1247,7 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
  *
  * @param tservice The service to generate a client interface definition for
  */
-void t_swift_3_generator::generate_swift_service_client(ofstream& out,
-                                                                t_service* tservice) {
+void t_swift_3_generator::generate_swift_service_client(ofstream& out, t_service* tservice) {
 
   indent(out) << "open class " << tservice->get_name() << "Client";// : "
 
@@ -1481,36 +1262,6 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out,
   block_open(out);
   out << endl;
 
-  // out << endl;
-
-  // indent(out) << "let inProtocol: TProtocol" << endl;
-
-  // indent(out) << "let outProtocol: TProtocol" << endl << endl;
-
-  // indent(out) << "public init(inoutProtocol: TProtocol)";
-
-  // block_open(out);
-
-  // indent(out) << "self.inProtocol = inoutProtocol" << endl;
-
-  // indent(out) << "self.outProtocol = inoutProtocol" << endl;
-
-  // block_close(out);
-
-  // out << endl;
-
-  // indent(out) << "public init(inProtocol: TProtocol, outProtocol: TProtocol)";
-
-  // block_open(out);
-
-  // indent(out) << "self.inProtocol = inProtocol" << endl;
-
-  // indent(out) << "self.outProtocol = outProtocol" << endl;
-
-  // block_close(out);
-
-  // out << endl;
-
   block_close(out);
 
   out << endl;
@@ -1521,8 +1272,7 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out,
  *
  * @param tservice The service to generate a client interface definition for
  */
-void t_swift_3_generator::generate_swift_service_client_async(ofstream& out,
-                                                                      t_service* tservice) {
+void t_swift_3_generator::generate_swift_service_client_async(ofstream& out, t_service* tservice) {
 
   indent(out) << "open class " << tservice->get_name() << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
 
@@ -1547,8 +1297,7 @@ void t_swift_3_generator::generate_swift_service_client_async(ofstream& out,
  *
  * @param tservice The service to generate a client interface definition for
  */
-void t_swift_3_generator::generate_swift_service_server(ofstream& out,
-                                                                t_service* tservice) {
+void t_swift_3_generator::generate_swift_service_server(ofstream& out, t_service* tservice) {
 
   indent(out) << "open class " << tservice->get_name() << "Processor /* " << tservice->get_name() << " */";
 
@@ -1583,10 +1332,7 @@ void t_swift_3_generator::generate_swift_service_server(ofstream& out,
  *                  Wether the first parameter must be a protocol or if
  *                  the protocol is to be assumed
  */
-void t_swift_3_generator::generate_swift_service_client_send_function_implementation(ofstream& out,
-                                                                                   t_service *tservice,
-                                                                                   t_function* tfunction,
-                                                                                   bool needs_protocol) {
+void t_swift_3_generator::generate_swift_service_client_send_function_implementation(ofstream& out, t_service *tservice, t_function* tfunction, bool needs_protocol) {
 
   string funname = tfunction->get_name();
 
@@ -1640,10 +1386,7 @@ void t_swift_3_generator::generate_swift_service_client_send_function_implementa
  *                  Wether the first parameter must be a protocol or if
  *                  the protocol is to be assumed
  */
-void t_swift_3_generator::generate_swift_service_client_recv_function_implementation(ofstream& out,
-                                                                                   t_service* tservice,
-                                                                                   t_function* tfunction,
-                                                                                   bool needs_protocol) {
+void t_swift_3_generator::generate_swift_service_client_recv_function_implementation(ofstream& out, t_service* tservice, t_function* tfunction, bool needs_protocol) {
 
   // Open function
   indent(out) << "private func recv_" << tfunction->get_name() << "(";
@@ -1714,8 +1457,7 @@ void t_swift_3_generator::generate_swift_service_client_recv_function_implementa
  *
  * @param tfunction The service to generate an implementation for
  */
-void t_swift_3_generator::generate_swift_service_client_send_function_invocation(ofstream& out,
-                                                                               t_function* tfunction) {
+void t_swift_3_generator::generate_swift_service_client_send_function_invocation(ofstream& out, t_function* tfunction) {
 
   indent(out) << "try send_" << tfunction->get_name() << "(";
 
@@ -1740,8 +1482,7 @@ void t_swift_3_generator::generate_swift_service_client_send_function_invocation
  *
  * @param tfunction The service to generate an implementation for
  */
-void t_swift_3_generator::generate_swift_service_client_send_async_function_invocation(ofstream& out,
-                                                                                     t_function* tfunction) {
+void t_swift_3_generator::generate_swift_service_client_send_async_function_invocation(ofstream& out, t_function* tfunction) {
 
   t_struct* arg_struct = tfunction->get_arglist();
   const vector<t_field*>& fields = arg_struct->get_members();
@@ -1761,8 +1502,7 @@ void t_swift_3_generator::generate_swift_service_client_send_async_function_invo
  *
  * @param tservice The service to generate an implementation for
  */
-void t_swift_3_generator::generate_swift_service_client_implementation(ofstream& out,
-                                                                     t_service* tservice) {
+void t_swift_3_generator::generate_swift_service_client_implementation(ofstream& out, t_service* tservice) {
 
   string name = tservice->get_name() + "Client";
 
@@ -1815,8 +1555,7 @@ void t_swift_3_generator::generate_swift_service_client_implementation(ofstream&
  *
  * @param tservice The service to generate an implementation for
  */
-void t_swift_3_generator::generate_swift_service_client_async_implementation(ofstream& out,
-                                                                           t_service* tservice) {
+void t_swift_3_generator::generate_swift_service_client_async_implementation(ofstream& out, t_service* tservice) {
 
   string name = tservice->get_name() + "AsyncClient";
   string protocol_name = tservice->get_name() + "Async";
@@ -1912,8 +1651,8 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
  *
  * @param tservice The service to generate an implementation for
  */
-void t_swift_3_generator::generate_swift_service_server_implementation(ofstream& out,
-                                                                     t_service* tservice) {
+
+void t_swift_3_generator::generate_swift_service_server_implementation(ofstream& out, t_service* tservice) {
 
   string name = tservice->get_name() + "Processor";
 
@@ -2120,9 +1859,7 @@ string t_swift_3_generator::base_type_name(t_base_type* type) {
  * Renders full constant value (as would be seen after an '=')
  *
  */
-void t_swift_3_generator::render_const_value(ostream& out,
-                                             t_type* type,
-                                             t_const_value* value) {
+void t_swift_3_generator::render_const_value(ostream& out, t_type* type, t_const_value* value) {
   type = get_true_type(type);
 
   if (type->is_base_type()) {
@@ -2301,7 +2038,7 @@ string t_swift_3_generator::function_signature(t_function* tfunction) {
 }
 
 /**
- * Renders a function signature
+ * Renders a function docstring
  *
  * @param tfunction Function definition
  * @return String of rendered function definition
@@ -2356,19 +2093,19 @@ void t_swift_3_generator::function_docstring(ofstream& out, t_function* tfunctio
 }
 
 /**
- * Renders a function signature
+ * Renders a function docstring
  *
  * @param tfunction Function definition
  * @return String of rendered function definition
  */
 void t_swift_3_generator::async_function_docstring(ofstream& out, t_function* tfunction) {
-
     // Generate docstring with following format:
     // /// <Description>
     // /// <empty line>
     // /// - Parameters:
     // ///   - <parameter>: <parameter docstring>
     // ///   - callback: <callback types>
+
     // Description
     string doc = tfunction->get_doc();
     generate_docstring(out, doc);
@@ -2390,7 +2127,8 @@ void t_swift_3_generator::async_function_docstring(ofstream& out, t_function* tf
     }
 
     // completion
-    indent(out) << "///   - completion: Block with return and exceptions: ";
+    indent(out) << "///   - completion: TAsyncResult<" << type_name(tfunction->get_returntype())
+                << "> wrapping return and following Exceptions: ";
     t_struct* xs = tfunction->get_xceptions();
     const vector<t_field*>& xceptions = xs->get_members();
     vector<t_field*>::const_iterator x_iter;
@@ -2548,6 +2286,4 @@ THRIFT_REGISTER_GENERATOR(
     "    log_unexpected:  Log every time an unexpected field ID or type is encountered.\n"
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
-    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n "
-    "    no_strict:       Initialize all struct fields with type defaults.  Use when target client/server"
-    "                     supports empty initialization with null required fields and doesn't properly initialize (i.e. python)")
+    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n ")

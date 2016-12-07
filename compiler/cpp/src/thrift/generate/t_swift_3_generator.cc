@@ -204,7 +204,11 @@ private:
 
 
   bool field_is_optional(t_field* tfield) {
-    return tfield->get_req() == t_field::T_OPTIONAL;
+    bool opt = tfield->get_req() == t_field::T_OPTIONAL;
+    if (tfield->annotations_.find("swift.nullable") != tfield->annotations_.end()) {
+      opt = true;
+    }
+    return opt;
   }
 
   bool struct_has_required_fields(t_struct* tstruct) {
@@ -601,7 +605,9 @@ void t_swift_3_generator::generate_swift_struct_init(ofstream& out, t_struct* ts
   block_open(out);
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-    if (all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) {
+    bool should_set = all;
+    should_set = should_set || !field_is_optional((*m_iter));
+    if (should_set) {
       out << indent() << "self." << maybe_escape_identifier((*m_iter)->get_name()) << " = "
           << maybe_escape_identifier((*m_iter)->get_name()) << endl;
     }
@@ -2184,17 +2190,26 @@ string t_swift_3_generator::argument_list(t_struct* tstruct, string protocol_nam
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field* arg = *f_iter;
-    result += arg->get_name() + ": " + type_name(arg->get_type());
-    t_const_value* default_value = arg->get_value();
-    if (default_val && default_value != NULL) {
-      // result << default_val;
-    }
+
+    // optional args not usually permitted for some reason, even though dynamic langs handle it
+    // use annotation "swift.nullable" to achieve
+    result += arg->get_name() + ": " + type_name(arg->get_type(), field_is_optional(arg));
+
+    // default values, ommitted for now
+    // t_const_value* default_value = arg->get_value();
+    // if (default_val && default_value != NULL) {
+    //   // result << default_val;
+    // }
+
+
+
     if (++f_iter != fields.end()) {
       result += ", ";
     }
   }
   return result;
 }
+
 
 /**
  * https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/LexicalStructure.html

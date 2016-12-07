@@ -753,7 +753,7 @@ void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out, t_
 
   generate_swift_struct_equatable_extension(out, tstruct, is_private);
 
-  if (!is_private && !is_result) {
+  if (!is_private && !is_result && debug_descriptions_) {
     generate_swift_struct_printable_extension(out, tstruct);
   }
 

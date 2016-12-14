@@ -20,7 +20,7 @@
 import Foundation
 
 
-public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConvertible, TSerializable {
+public struct TSet<Element : TSerializable> : Collection, ExpressibleByArrayLiteral, TSerializable {
   
   public static var thriftType : TType { return .SET }
   
@@ -28,7 +28,7 @@ public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConver
   
   typealias Storage = Set<Element>
   
-  private var storage : Storage
+  fileprivate var storage : Storage
   
   public init() {
     storage = Storage()
@@ -38,7 +38,7 @@ public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConver
     storage = Storage(elements)
   }
   
-  public init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S) {
+  public init<S : Sequence>(_ sequence: S) where S.Iterator.Element == Element {
     storage = Storage(sequence)    
   }
   
@@ -46,64 +46,68 @@ public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConver
   
   public var endIndex : Index { return storage.endIndex }
   
-  public mutating func insert(member: Element) {
-    return storage.insert(member)
+  public func index(after i: SetIndex<Element>) -> SetIndex<Element> {
+    return storage.index(after: i)
+  }
+    
+  public mutating func insert(_ member: Element) {
+    storage.insert(member)
   }
   
-  public mutating func remove(element: Element) -> Element? {
+  public mutating func remove(_ element: Element) -> Element? {
     return storage.remove(element)
   }
   
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    return storage.removeAll(keepCapacity: keepCapacity)
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    return storage.removeAll(keepingCapacity: keepCapacity)
   }
   
-  public mutating func removeAtIndex(index: SetIndex<Element>) -> Element {
-    return storage.removeAtIndex(index)
+  public mutating func removeAtIndex(_ index: SetIndex<Element>) -> Element {
+    return storage.remove(at: index)
   }
   
   public subscript (position: SetIndex<Element>) -> Element {
     return storage[position]
   }
   
-  public func union(other: TSet) -> TSet {
+  public func union(_ other: TSet) -> TSet {
     return TSet(storage.union(other))
   }
   
-  public func intersect(other: TSet) -> TSet {
-    return TSet(storage.intersect(other))
+  public func intersect(_ other: TSet) -> TSet {
+    return TSet(storage.intersection(other))
   }
   
-  public func exclusiveOr(other: TSet) -> TSet {
-    return TSet(storage.exclusiveOr(other))
+  public func exclusiveOr(_ other: TSet) -> TSet {
+    return TSet(storage.symmetricDifference(other))
   }
   
-  public func subtract(other: TSet) -> TSet {
-    return TSet(storage.subtract(other))
+  public func subtract(_ other: TSet) -> TSet {
+    return TSet(storage.subtracting(other))
   }
   
-  public mutating func intersectInPlace(other: TSet) {
-    storage.intersectInPlace(other)
+  public mutating func intersectInPlace(_ other: TSet) {
+    storage.formIntersection(other)
   }
 
-  public mutating func exclusiveOrInPlace(other: TSet) {
-    storage.exclusiveOrInPlace(other)
+  public mutating func exclusiveOrInPlace(_ other: TSet) {
+    storage.formSymmetricDifference(other)
   }
 
-  public mutating func subtractInPlace(other: TSet) {
-    storage.subtractInPlace(other)
+  public mutating func subtractInPlace(_ other: TSet) {
+    storage.subtract(other)
   }  
 
-  public func isSubsetOf(other: TSet) -> Bool {
-    return storage.isSubsetOf(other)
+  public func isSubsetOf(_ other: TSet) -> Bool {
+    return storage.isSubset(of: other)
   }
 
-  public func isDisjointWith(other: TSet) -> Bool {
-    return storage.isDisjointWith(other)
+  public func isDisjointWith(_ other: TSet) -> Bool {
+    return storage.isDisjoint(with: other)
   }
   
-  public func isSupersetOf(other: TSet) -> Bool {
-    return storage.isSupersetOf(other)
+  public func isSupersetOf(_ other: TSet) -> Bool {
+    return storage.isSuperset(of: other)
   }
 
   public var isEmpty: Bool { return storage.isEmpty }
@@ -117,13 +121,13 @@ public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConver
     return result
   }
   
-  public static func readValueFromProtocol(proto: TProtocol) throws -> TSet {
+  public static func readValueFromProtocol(_ proto: TProtocol) throws -> TSet {
     let (elementType, size) = try proto.readSetBegin()
     if elementType != Element.thriftType {
       throw NSError(
         domain: TProtocolErrorDomain,
-        code: Int(TProtocolError.InvalidData.rawValue),
-        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(int: elementType.rawValue)])
+        code: Int(TProtocolError.invalidData.rawValue),
+        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(value: elementType.rawValue as Int32)])
     }
     var set = TSet()
     for _ in 0..<size {
@@ -134,7 +138,7 @@ public struct TSet<Element : TSerializable> : CollectionType, ArrayLiteralConver
     return set
   }
   
-  public static func writeValue(value: TSet, toProtocol proto: TProtocol) throws {
+  public static func writeValue(_ value: TSet, toProtocol proto: TProtocol) throws {
     try proto.writeSetBeginWithElementType(Element.thriftType, size: value.count)
     for element in value.storage {
       try Element.writeValue(element, toProtocol: proto)

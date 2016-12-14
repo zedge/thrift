@@ -33,8 +33,8 @@ public extension TProtocol {
     return (name as String!, TMessageType(rawValue: type)!, Int(sequenceID))
   }
   
-  public func writeMessageBeginWithName(name: String, type: TMessageType, sequenceID: Int) throws {
-    try writeMessageBeginWithName(name, type: type.rawValue, sequenceID: Int32(sequenceID))
+  public func writeMessageBeginWithName(_ name: String, type: TMessageType, sequenceID: Int) throws {
+    try writeMessageBegin(withName: name, type: type.rawValue, sequenceID: Int32(sequenceID))
   }
   
   public func readStructBegin() throws -> (String?) {
@@ -57,8 +57,8 @@ public extension TProtocol {
     return (name as String?, TType(rawValue: type)!, Int(fieldID))
   }
   
-  public func writeFieldBeginWithName(name: String, type: TType, fieldID: Int) throws {
-    try writeFieldBeginWithName(name, type: type.rawValue, fieldID: Int32(fieldID))
+  public func writeFieldBeginWithName(_ name: String, type: TType, fieldID: Int) throws {
+    try writeFieldBegin(withName: name, type: type.rawValue, fieldID: Int32(fieldID))
   }
   
   public func readMapBegin() throws -> (TType, TType, Int32) {
@@ -72,8 +72,8 @@ public extension TProtocol {
     return (TType(rawValue: keyType)!, TType(rawValue: valueType)!, size)
   }
   
-  public func writeMapBeginWithKeyType(keyType: TType, valueType: TType, size: Int) throws {
-    try writeMapBeginWithKeyType(keyType.rawValue, valueType: valueType.rawValue, size: Int32(size))
+  public func writeMapBeginWithKeyType(_ keyType: TType, valueType: TType, size: Int) throws {
+    try writeMapBegin(withKeyType: keyType.rawValue, valueType: valueType.rawValue, size: Int32(size))
   }
   
   public func readSetBegin() throws -> (TType, Int32) {
@@ -86,8 +86,8 @@ public extension TProtocol {
     return (TType(rawValue: elementType)!, size)
   }
   
-  public func writeSetBeginWithElementType(elementType: TType, size: Int) throws {
-    try writeSetBeginWithElementType(elementType.rawValue, size: Int32(size))
+  public func writeSetBeginWithElementType(_ elementType: TType, size: Int) throws {
+    try writeSetBegin(withElementType: elementType.rawValue, size: Int32(size))
   }
   
   public func readListBegin() throws -> (TType, Int32) {
@@ -100,12 +100,12 @@ public extension TProtocol {
     return (TType(rawValue: elementType)!, size)
   }
   
-  public func writeListBeginWithElementType(elementType: TType, size: Int) throws {
-    try writeListBeginWithElementType(elementType.rawValue, size: Int32(size))
+  public func writeListBeginWithElementType(_ elementType: TType, size: Int) throws {
+    try writeListBegin(withElementType: elementType.rawValue, size: Int32(size))
   }
   
-  public func writeFieldValue<T: TSerializable>(value: T, name: String, type: TType, id: Int32) throws {
-    try writeFieldBeginWithName(name, type: type.rawValue, fieldID: id)
+  public func writeFieldValue<T: TSerializable>(_ value: T, name: String, type: TType, id: Int32) throws {
+    try writeFieldBegin(withName: name, type: type.rawValue, fieldID: id)
     try writeValue(value)
     try writeFieldEnd()
   }
@@ -114,7 +114,7 @@ public extension TProtocol {
     return try T.readValueFromProtocol(self)
   }
   
-  public func writeValue<T: TSerializable>(value: T) throws {
+  public func writeValue<T: TSerializable>(_ value: T) throws {
     try T.writeValue(value, toProtocol: self)
   }
   
@@ -130,21 +130,21 @@ public extension TProtocol {
     return
   }
   
-  public func validateValue(value: Any?, named name: String) throws {
+  public func validateValue(_ value: Any?, named name: String) throws {
     
     if value == nil {
       throw NSError(
         domain: TProtocolErrorDomain,
-        code: Int(TProtocolError.Unknown.rawValue),
+        code: Int(TProtocolError.unknown.rawValue),
         userInfo: [TProtocolErrorFieldNameKey: name])
     }
     
   }
   
-  public func readException() throws -> ErrorType {
+  public func readException() throws -> Error {
     
     var reason : String?
-    var type = TApplicationError.Unknown
+    var type = TApplicationError.unknown
     
     try readStructBegin()
     
@@ -177,14 +177,14 @@ public extension TProtocol {
     return NSError(type:type, reason:reason ?? "")
   }
   
-  public func writeExceptionForMessageName(name: String, sequenceID: Int, ex: NSError) throws {
+  public func writeExceptionForMessageName(_ name: String, sequenceID: Int, ex: NSError) throws {
     try writeMessageBeginWithName(name, type: .EXCEPTION, sequenceID: sequenceID)
     try ex.write(self)
     try writeMessageEnd()
   }
   
-  public func skipType(type: TType) throws {
-    try TProtocolUtil.skipType(type.rawValue, onProtocol: self)
+  public func skipType(_ type: TType) throws {
+    try TProtocolUtil.skipType(type.rawValue, on: self)
   }
   
 }

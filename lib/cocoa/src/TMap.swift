@@ -20,7 +20,7 @@
 import Foundation
 
 
-public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType, DictionaryLiteralConvertible, TSerializable {
+public struct TMap<Key : TSerializable, Value : TSerializable> : Collection, ExpressibleByDictionaryLiteral, TSerializable {
   
   public static var thriftType : TType { return .MAP }
 
@@ -30,7 +30,7 @@ public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType,
 
   public typealias Element = Storage.Element
   
-  private var storage : Storage
+  fileprivate var storage : Storage
 
   public var startIndex : Index {
     return storage.startIndex
@@ -69,8 +69,12 @@ public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType,
     }
   }
   
-  public func indexForKey(key: Key) -> Index? {
-    return storage.indexForKey(key)
+  public func index(after i: DictionaryIndex<Key, Value>) -> DictionaryIndex<Key, Value> {
+    return storage.index(after: i)
+  }
+   
+  public func indexForKey(_ key: Key) -> Index? {
+    return storage.index(forKey: key)
   }
   
   public subscript (key: Key) -> Value? {
@@ -82,20 +86,20 @@ public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType,
     }
   }
 
-  public mutating func updateValue(value: Value, forKey key: Key) -> Value? {
+  public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     return updateValue(value, forKey: key)
   }
   
-  public mutating func removeAtIndex(index: DictionaryIndex<Key, Value>) -> (Key, Value) {
+  public mutating func removeAtIndex(_ index: DictionaryIndex<Key, Value>) -> (Key, Value) {
     return removeAtIndex(index)
   }
   
-  public mutating func removeValueForKey(key: Key) -> Value? {
-    return storage.removeValueForKey(key)
+  public mutating func removeValueForKey(_ key: Key) -> Value? {
+    return storage.removeValue(forKey: key)
   }
   
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    storage.removeAll(keepCapacity: keepCapacity)
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    storage.removeAll(keepingCapacity: keepCapacity)
   }
 
   public var hashValue : Int {
@@ -108,13 +112,13 @@ public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType,
     return result
   }
   
-  public static func readValueFromProtocol(proto: TProtocol) throws -> TMap {
+  public static func readValueFromProtocol(_ proto: TProtocol) throws -> TMap {
     let (keyType, valueType, size) = try proto.readMapBegin()
     if keyType != Key.thriftType || valueType != Value.thriftType {
       throw NSError(
         domain: TProtocolErrorDomain,
-        code: Int(TProtocolError.InvalidData.rawValue),
-        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(int: TProtocolExtendedError.UnexpectedType.rawValue)])
+        code: Int(TProtocolError.invalidData.rawValue),
+        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(value: TProtocolExtendedError.unexpectedType.rawValue as Int32)])
     }
     var map = TMap()
     for _ in 0..<size {
@@ -126,7 +130,7 @@ public struct TMap<Key : TSerializable, Value : TSerializable> : CollectionType,
     return map
   }
   
-  public static func writeValue(value: TMap, toProtocol proto: TProtocol) throws {
+  public static func writeValue(_ value: TMap, toProtocol proto: TProtocol) throws {
     try proto.writeMapBeginWithKeyType(Key.thriftType, valueType: Value.thriftType, size: value.count)
     for (key, value) in value.storage {
       try Key.writeValue(key, toProtocol: proto)

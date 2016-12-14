@@ -21,7 +21,7 @@ import Foundation
 
 
 
-public struct TList<Element : TSerializable> : MutableCollectionType, Hashable, ArrayLiteralConvertible, TSerializable {
+public struct TList<Element : TSerializable> : MutableCollection, Hashable, ExpressibleByArrayLiteral, TSerializable {
   
   public static var thriftType : TType { return .LIST }
   
@@ -29,7 +29,7 @@ public struct TList<Element : TSerializable> : MutableCollectionType, Hashable, 
 
   public typealias Index = Storage.Index
   
-  private var storage = Storage()
+  fileprivate var storage = Storage()
   
   public var startIndex : Index {
     return storage.startIndex
@@ -65,31 +65,35 @@ public struct TList<Element : TSerializable> : MutableCollectionType, Hashable, 
     self.storage = Storage()
   }
   
-  public mutating func append(newElement: Element) {
+  public mutating func append(_ newElement: Element) {
     self.storage.append(newElement)
   }
   
-  public mutating func appendContentsOf<C : CollectionType where C.Generator.Element == Element>(newstorage: C) {
-    self.storage.appendContentsOf(newstorage)
+  public mutating func appendContentsOf<C : Collection>(_ newstorage: C) where C.Iterator.Element == Element {
+    self.storage.append(contentsOf: newstorage)
+  }
+
+  public func index(after i: Int) -> Int {
+    return storage.index(after: i)
+  }
+
+  public mutating func insert(_ newElement: Element, atIndex index: Int) {
+    self.storage.insert(newElement, at: index)
   }
   
-  public mutating func insert(newElement: Element, atIndex index: Int) {
-    self.storage.insert(newElement, atIndex: index)
+  public mutating func insertContentsOf<C : Collection>(_ newElements: C, at index: Int) where C.Iterator.Element == Element {
+    self.storage.insert(contentsOf: newElements, at: index)
   }
   
-  public mutating func insertContentsOf<C : CollectionType where C.Generator.Element == Element>(newElements: C, at index: Int) {
-    self.storage.insertContentsOf(newElements, at: index)
+  public mutating func removeAll(keepCapacity: Bool = true) {
+    self.storage.removeAll(keepingCapacity: keepCapacity)
   }
   
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = true) {
-    self.storage.removeAll(keepCapacity: keepCapacity)
+  public mutating func removeAtIndex(_ index: Index) {
+    self.storage.remove(at: index)
   }
   
-  public mutating func removeAtIndex(index: Index) {
-    self.storage.removeAtIndex(index)
-  }
-  
-  public mutating func removeFirst(n: Int = 0) {
+  public mutating func removeFirst(_ n: Int = 0) {
     self.storage.removeFirst(n)
   }
   
@@ -97,21 +101,21 @@ public struct TList<Element : TSerializable> : MutableCollectionType, Hashable, 
     return self.storage.removeLast()
   }
   
-  public mutating func removeRange(subRange: Range<Index>) {
-    self.storage.removeRange(subRange)
+  public mutating func removeRange(_ subRange: Range<Index>) {
+    self.storage.removeSubrange(subRange)
   }
   
-  public mutating func reserveCapacity(minimumCapacity: Int) {
+  public mutating func reserveCapacity(_ minimumCapacity: Int) {
     self.storage.reserveCapacity(minimumCapacity)
   }
   
-  public static func readValueFromProtocol(proto: TProtocol) throws -> TList {
+  public static func readValueFromProtocol(_ proto: TProtocol) throws -> TList {
     let (elementType, size) = try proto.readListBegin()
     if elementType != Element.thriftType {
       throw NSError(
         domain: TProtocolErrorDomain,
-        code: Int(TProtocolError.InvalidData.rawValue),
-        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(int: TProtocolExtendedError.UnexpectedType.rawValue)])
+        code: Int(TProtocolError.invalidData.rawValue),
+        userInfo: [TProtocolErrorExtendedErrorKey: NSNumber(value: TProtocolExtendedError.unexpectedType.rawValue as Int32)])
     }
     var list = TList()
     for _ in 0..<size {
@@ -122,7 +126,7 @@ public struct TList<Element : TSerializable> : MutableCollectionType, Hashable, 
     return list
   }
   
-  public static func writeValue(value: TList, toProtocol proto: TProtocol) throws {
+  public static func writeValue(_ value: TList, toProtocol proto: TProtocol) throws {
     try proto.writeListBeginWithElementType(Element.thriftType, size: value.count)
     for element in value.storage {
       try Element.writeValue(element, toProtocol: proto)

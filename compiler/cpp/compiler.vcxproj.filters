@@ -161,7 +161,13 @@
     <ClCompile Include="src\generate\t_rb_generator.cc">
       <Filter>generate</Filter>
     </ClCompile>
+    <ClCompile Include="src\generate\t_rs_generator.cc">
+      <Filter>generate</Filter>
+    </ClCompile>
     <ClCompile Include="src\generate\t_st_generator.cc">
+      <Filter>generate</Filter>
+    </ClCompile>
+    <ClCompile Include="src\generate\t_swift_3_generator.cc">
       <Filter>generate</Filter>
     </ClCompile>
     <ClCompile Include="src\generate\t_swift_generator.cc">

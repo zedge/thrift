@@ -22,5 +22,8 @@ all-local:
 
 clean-local:
 	$(RM) -r .pub
+	find . -type d -name "packages" | xargs $(RM) -r
+	find . -type f -name ".packages" | xargs $(RM)
+	find . -type f -name "pubspec.lock" | xargs $(RM)
 
 check-local: all

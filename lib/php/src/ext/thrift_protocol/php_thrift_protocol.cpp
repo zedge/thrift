@@ -543,7 +543,7 @@ void binary_deserialize(int8_t thrift_typeID, PHPInputTransport& transport, zval
         }
         else {
           if (Z_TYPE_P(key) != IS_STRING) convert_to_string(key);
-          zend_hash_update(return_value->value.ht, Z_STRVAL_P(key), Z_STRLEN_P(key) + 1, &value, sizeof(zval *), NULL);
+          zend_symtable_update(return_value->value.ht, Z_STRVAL_P(key), Z_STRLEN_P(key) + 1, &value, sizeof(zval *), NULL);
         }
         zval_ptr_dtor(&key);
       }
@@ -589,7 +589,7 @@ void binary_deserialize(int8_t thrift_typeID, PHPInputTransport& transport, zval
         }
         else {
           if (Z_TYPE_P(key) != IS_STRING) convert_to_string(key);
-          zend_hash_update(return_value->value.ht, Z_STRVAL_P(key), Z_STRLEN_P(key) + 1, &value, sizeof(zval *), NULL);
+          zend_symtable_update(return_value->value.ht, Z_STRVAL_P(key), Z_STRLEN_P(key) + 1, &value, sizeof(zval *), NULL);
         }
         zval_ptr_dtor(&key);
       }
@@ -994,7 +994,7 @@ PHP_FUNCTION(thrift_protocol_write_binary) {
   }
 }
 
-// 3 params: $transport $response_Typename $strict_read
+// 4 params: $transport $response_Typename $strict_read $buffer_size
 PHP_FUNCTION(thrift_protocol_read_binary) {
   int argc = ZEND_NUM_ARGS();
 
@@ -1017,8 +1017,19 @@ PHP_FUNCTION(thrift_protocol_read_binary) {
     RETURN_NULL();
   }
 
+  if (argc == 4 && Z_TYPE_PP(args[3]) != IS_LONG) {
+    php_error_docref(NULL TSRMLS_CC, E_ERROR, "4nd parameter is not an integer (typename of expected buffer size)");
+    efree(args);
+    RETURN_NULL();
+  }
+
   try {
-    PHPInputTransport transport(*args[0]);
+    size_t buffer_size = 8192;
+    if (argc == 4) {
+      buffer_size = Z_LVAL_PP(args[3]);
+    }
+
+    PHPInputTransport transport(*args[0], buffer_size);
     char* obj_typename = Z_STRVAL_PP(args[1]);
     convert_to_boolean(*args[2]);
     bool strict_read = Z_BVAL_PP(args[2]);

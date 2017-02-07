@@ -56,9 +56,11 @@ RUN yum install -y \
 # Python Dependencies
 RUN yum install -y \
       python-devel \
+      python-pip \
       python-setuptools \
-      python-twisted-web \
-      python-pip
+      python-six \
+      python-twisted-web && \
+    pip install -U backports.ssl_match_hostname ipaddress tornado
 
 # Ruby Dependencies
 RUN yum install -y \
@@ -127,7 +129,8 @@ RUN yum install -y \
 
 # CMake
 RUN curl -sSL https://cmake.org/files/v3.4/cmake-3.4.0.tar.gz | tar -xz && \
-    cd cmake-3.4.0 && ./bootstrap && make -j4 && make install
+    cd cmake-3.4.0 && ./bootstrap && make -j4 && make install && \
+    cd .. && rm -rf cmake-3.4.0
 
 # Clean up
 RUN rm -rf /tmp/* && \
@@ -135,5 +138,5 @@ RUN rm -rf /tmp/* && \
 
 ENV THRIFT_ROOT /thrift
 RUN mkdir -p $THRIFT_ROOT/src
-COPY scripts $THRIFT_ROOT
+COPY Dockerfile $THRIFT_ROOT/
 WORKDIR $THRIFT_ROOT/src

@@ -58,7 +58,11 @@
 #    define THRIFT_GAI_STRERROR gai_strerrorA
 #  endif
 #  define THRIFT_SSIZET ptrdiff_t
-#  define THRIFT_SNPRINTF _snprintf
+#  if (_MSC_VER < 1900)
+#    define THRIFT_SNPRINTF _snprintf
+#  else
+#    define THRIFT_SNPRINTF snprintf
+#  endif
 #  define THRIFT_SLEEP_SEC thrift_sleep
 #  define THRIFT_SLEEP_USEC thrift_usleep
 #  define THRIFT_TIMESPEC thrift_timespec
@@ -74,6 +78,9 @@
 #    define THRIFT_POLLOUT POLLOUT
 #  endif //WINVER
 #  define THRIFT_SHUT_RDWR SD_BOTH
+#  if _WIN32_WINNT < 0x0600
+#    define AI_ADDRCONFIG 0
+#  endif
 #else //not _WIN32
 #  include <errno.h>
 #  define THRIFT_GET_SOCKET_ERROR errno

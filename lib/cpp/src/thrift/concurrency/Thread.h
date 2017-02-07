@@ -108,8 +108,9 @@ public:
   virtual void start() = 0;
 
   /**
-   * Join this thread. Current thread blocks until this target thread
-   * completes.
+   * Join this thread. If this thread is joinable, the calling thread blocks
+   * until this thread completes.  If the target thread is not joinable, then
+   * nothing happens.
    */
   virtual void join() = 0;
 
@@ -135,18 +136,41 @@ private:
  * object for execution
  */
 class ThreadFactory {
+protected:
+  ThreadFactory(bool detached) : detached_(detached) { }
 
 public:
-  virtual ~ThreadFactory() {}
+  virtual ~ThreadFactory() { }
+
+  /**
+   * Gets current detached mode
+   */
+  bool isDetached() const { return detached_; }
+
+  /**
+   * Sets the detached disposition of newly created threads.
+   */
+  void setDetached(bool detached) { detached_ = detached; }
+
+  /**
+   * Create a new thread.
+   */
   virtual boost::shared_ptr<Thread> newThread(boost::shared_ptr<Runnable> runnable) const = 0;
 
-  /** Gets the current thread id or unknown_thread_id if the current thread is not a thrift thread
+  /**
+   * Gets the current thread id or unknown_thread_id if the current thread is not a thrift thread
    */
+  virtual Thread::id_t getCurrentThreadId() const = 0;
 
+  /**
+   * For code readability define the unknown/undefined thread id
+   */
   static const Thread::id_t unknown_thread_id;
 
-  virtual Thread::id_t getCurrentThreadId() const = 0;
+private:
+  bool detached_;
 };
+
 }
 }
 } // apache::thrift::concurrency

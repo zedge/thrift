@@ -58,6 +58,7 @@ public:
     async_clients_ = false;
     debug_descriptions_ = false;
     no_strict_ = false;
+    prefix_namespace_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -68,6 +69,8 @@ public:
         no_strict_ = true;
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
+      } else if( iter->first.compare("prefix_namespace") == 0) {
+        prefix_namespace_ = true;
       } else {
         throw "unknown option swift:" + iter->first;
       }
@@ -174,6 +177,7 @@ public:
   string swift_thrift_imports();
   string type_name(t_type* ttype, bool is_optional=false, bool is_forced=false);
   string base_type_name(t_base_type* tbase);
+  string definition_name(const string& name);
   string declare_property(t_field* tfield, bool is_private);
   string function_signature(t_function* tfunction);
   string async_function_signature(t_function* tfunction);
@@ -246,6 +250,7 @@ private:
   bool async_clients_;
   bool debug_descriptions_;
   bool no_strict_;
+  bool prefix_namespace_;
 
   set<string> swift_reserved_words_;
 };
@@ -368,7 +373,8 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_3_generator::generate_enum(t_enum* tenum) {
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32, TEnum";
+  string enum_name = definition_name(tenum->get_name());
+  f_decl_ << indent() << "public enum " << enum_name << " : Int32, TEnum";
   block_open(f_decl_);
 
   vector<t_enum_value*> constants = tenum->get_constants();
@@ -428,7 +434,7 @@ void t_swift_3_generator::generate_consts(vector<t_const*> consts) {
   vector<t_const*>::iterator c_iter;
   for (c_iter = consts.begin(); c_iter != consts.end(); ++c_iter) {
     t_type* type = (*c_iter)->get_type();
-    const_interface << "public let " << capitalize((*c_iter)->get_name()) << " : " << type_name(type) << " = ";
+    const_interface << "public let " << definition_name(capitalize((*c_iter)->get_name())) << " : " << type_name(type) << " = ";
     render_const_value(const_interface, type, (*c_iter)->get_value());
     const_interface << endl << endl;
   }
@@ -514,7 +520,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out, t_struct* tstruct
 
   if (tstruct->is_union()) {
     // special, unions
-    out << indent() << "public enum " << tstruct->get_name();
+    out << indent() << "public enum " << definition_name(tstruct->get_name());
     block_open(out);
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
       out << endl;
@@ -529,7 +535,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out, t_struct* tstruct
 
     string visibility = is_private ? "fileprivate" : "public";
 
-    out << indent() << visibility << " final class " << tstruct->get_name();
+    out << indent() << visibility << " final class " << definition_name(tstruct->get_name());
 
     if (tstruct->is_xception()) {
       out << " : Swift.Error"; // Error seems to be a common exception name in thrift
@@ -629,7 +635,7 @@ void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out
 
   string visibility = is_private ? "fileprivate" : "public";
 
-  indent(out) << "extension " << tstruct->get_name() << " : Hashable";
+  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : Hashable";
 
   block_open(out);
 
@@ -775,7 +781,7 @@ void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out, t_
  */
 void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out, t_struct* tstruct, bool is_result, bool is_private) {
 
-  indent(out) << "extension " << tstruct->get_name() << " : TStruct";
+  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : TStruct";
 
   block_open(out);
 
@@ -816,11 +822,11 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out, 
 
 void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* tstruct) {
   indent(out) << "public static func read(from proto: TProtocol) throws -> "
-              << tstruct->get_name();
+              << definition_name(tstruct->get_name());
   block_open(out);
   indent(out) << "_ = try proto.readStructBegin()" << endl;
 
-  indent(out) << "var ret: " << tstruct->get_name() << "?";
+  indent(out) << "var ret: " << definition_name(tstruct->get_name()) << "?";
   out << endl;
   indent(out) << "fields: while true";
   block_open(out);
@@ -865,7 +871,7 @@ void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* t
     }
 
     // indent_up();
-    indent(out) << padding << "ret = " << tstruct->get_name() << "."
+    indent(out) << padding << "ret = " << definition_name(tstruct->get_name()) << "."
                 << (*f_iter)->get_name() << "(val: " << "try "
                 << type_name((*f_iter)->get_type(), false, false)
                 << ".read(from: proto))" << endl;
@@ -884,7 +890,7 @@ void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* t
   block_close(out);
   out << endl;
   indent(out) << "throw TProtocolError(error: .unknown, message: \"Missing required value for type: "
-              << tstruct->get_name() << "\")";
+              << definition_name(tstruct->get_name()) << "\")";
   block_close(out);
   out << endl;
 
@@ -904,7 +910,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out, t_struct* 
   string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " static func read(from proto: TProtocol) throws -> "
-              << tstruct->get_name();
+              << definition_name(tstruct->get_name());
 
   block_open(out);
 
@@ -1011,7 +1017,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out, t_struct* 
 
   out << endl;
 
-  indent(out) << "return " << tstruct->get_name() << "(";
+  indent(out) << "return " << definition_name(tstruct->get_name()) << "(";
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     out << (*f_iter)->get_name() << ": " << maybe_escape_identifier((*f_iter)->get_name());
     if (++f_iter != fields.end()) {
@@ -1038,7 +1044,7 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
 
-  indent(out) << "extension " << tstruct->get_name() << " : "
+  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : "
               << (debug_descriptions_ ? "CustomDebugStringConvertible" : "CustomStringConvertible");
 
   block_open(out);
@@ -1049,7 +1055,7 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
 
   block_open(out);
 
-  indent(out) << "var desc = \"" << tstruct->get_name();
+  indent(out) << "var desc = \"" << definition_name(tstruct->get_name());
 
   if (!tstruct->is_union()) {
     out << "(\"" << endl;
@@ -1814,6 +1820,13 @@ string t_swift_3_generator::type_name(t_type* ttype, bool is_optional, bool is_f
   }
   else {
     result = ttype->get_name();
+
+    if (prefix_namespace_) {
+      t_program* program = ttype->get_program();
+      if (program) {
+        result = program->get_namespace("swift") + result;
+      }
+    }
   }
 
   if (is_optional) {
@@ -1825,6 +1838,19 @@ string t_swift_3_generator::type_name(t_type* ttype, bool is_optional, bool is_f
   }
 
   return result;
+}
+
+/**
+ * Maybe add a Cocoa-style prefix to a name used in a definition
+ *
+ * @param string name identifier for class or enum etc
+ */
+string t_swift_3_generator::definition_name(const string& name) {
+  if (prefix_namespace_) {
+    return program_->get_namespace("swift") + name;
+  } else {
+    return name;
+  }
 }
 
 /**
@@ -1896,7 +1922,7 @@ void t_swift_3_generator::render_const_value(ostream& out, t_type* type, t_const
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    out << enum_const_name(value->get_identifier());
+    out << definition_name(enum_const_name(value->get_identifier()));
   } else if (type->is_struct() || type->is_xception()) {
 
     out << type_name(type) << "(";
@@ -2360,4 +2386,7 @@ THRIFT_REGISTER_GENERATOR(
     "    log_unexpected:  Log every time an unexpected field ID or type is encountered.\n"
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
-    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n ")
+    "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
+    "    prefix_namespace:\n"
+    "                     Use the provided swift namespace as a prefix for all symbols.\n"
+)

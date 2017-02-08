@@ -72,7 +72,7 @@ public:
       } else if( iter->first.compare("prefix_namespace") == 0) {
         prefix_namespace_ = true;
       } else {
-        throw "unknown option swift:" + iter->first;
+        throw "unknown option swift_3:" + iter->first;
       }
     }
 
@@ -373,7 +373,7 @@ void t_swift_3_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_3_generator::generate_enum(t_enum* tenum) {
-  string enum_name = definition_name(tenum->get_name());
+  string enum_name = type_name(tenum);
   f_decl_ << indent() << "public enum " << enum_name << " : Int32, TEnum";
   block_open(f_decl_);
 
@@ -520,7 +520,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out, t_struct* tstruct
 
   if (tstruct->is_union()) {
     // special, unions
-    out << indent() << "public enum " << definition_name(tstruct->get_name());
+    out << indent() << "public enum " << type_name(tstruct);
     block_open(out);
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
       out << endl;
@@ -535,7 +535,7 @@ void t_swift_3_generator::generate_swift_struct(ofstream& out, t_struct* tstruct
 
     string visibility = is_private ? "fileprivate" : "public";
 
-    out << indent() << visibility << " final class " << definition_name(tstruct->get_name());
+    out << indent() << visibility << " final class " << type_name(tstruct);
 
     if (tstruct->is_xception()) {
       out << " : Swift.Error"; // Error seems to be a common exception name in thrift
@@ -635,7 +635,7 @@ void t_swift_3_generator::generate_swift_struct_hashable_extension(ofstream& out
 
   string visibility = is_private ? "fileprivate" : "public";
 
-  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : Hashable";
+  indent(out) << "extension " << type_name(tstruct) << " : Hashable";
 
   block_open(out);
 
@@ -781,7 +781,7 @@ void t_swift_3_generator::generate_swift_struct_implementation(ofstream& out, t_
  */
 void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out, t_struct* tstruct, bool is_result, bool is_private) {
 
-  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : TStruct";
+  indent(out) << "extension " << type_name(tstruct) << " : TStruct";
 
   block_open(out);
 
@@ -822,11 +822,11 @@ void t_swift_3_generator::generate_swift_struct_thrift_extension(ofstream& out, 
 
 void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* tstruct) {
   indent(out) << "public static func read(from proto: TProtocol) throws -> "
-              << definition_name(tstruct->get_name());
+              << type_name(tstruct);
   block_open(out);
   indent(out) << "_ = try proto.readStructBegin()" << endl;
 
-  indent(out) << "var ret: " << definition_name(tstruct->get_name()) << "?";
+  indent(out) << "var ret: " << type_name(tstruct) << "?";
   out << endl;
   indent(out) << "fields: while true";
   block_open(out);
@@ -871,7 +871,7 @@ void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* t
     }
 
     // indent_up();
-    indent(out) << padding << "ret = " << definition_name(tstruct->get_name()) << "."
+    indent(out) << padding << "ret = " << type_name(tstruct) << "."
                 << (*f_iter)->get_name() << "(val: " << "try "
                 << type_name((*f_iter)->get_type(), false, false)
                 << ".read(from: proto))" << endl;
@@ -890,7 +890,7 @@ void t_swift_3_generator::generate_swift_union_reader(ofstream& out, t_struct* t
   block_close(out);
   out << endl;
   indent(out) << "throw TProtocolError(error: .unknown, message: \"Missing required value for type: "
-              << definition_name(tstruct->get_name()) << "\")";
+              << type_name(tstruct) << "\")";
   block_close(out);
   out << endl;
 
@@ -910,7 +910,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out, t_struct* 
   string visibility = is_private ? "fileprivate" : "public";
 
   indent(out) << visibility << " static func read(from proto: TProtocol) throws -> "
-              << definition_name(tstruct->get_name());
+              << type_name(tstruct);
 
   block_open(out);
 
@@ -1017,7 +1017,7 @@ void t_swift_3_generator::generate_swift_struct_reader(ofstream& out, t_struct* 
 
   out << endl;
 
-  indent(out) << "return " << definition_name(tstruct->get_name()) << "(";
+  indent(out) << "return " << type_name(tstruct) << "(";
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     out << (*f_iter)->get_name() << ": " << maybe_escape_identifier((*f_iter)->get_name());
     if (++f_iter != fields.end()) {
@@ -1044,7 +1044,7 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
 
-  indent(out) << "extension " << definition_name(tstruct->get_name()) << " : "
+  indent(out) << "extension " << type_name(tstruct) << " : "
               << (debug_descriptions_ ? "CustomDebugStringConvertible" : "CustomStringConvertible");
 
   block_open(out);
@@ -1055,7 +1055,7 @@ void t_swift_3_generator::generate_swift_struct_printable_extension(ofstream& ou
 
   block_open(out);
 
-  indent(out) << "var desc = \"" << definition_name(tstruct->get_name());
+  indent(out) << "var desc = \"" << type_name(tstruct);
 
   if (!tstruct->is_union()) {
     out << "(\"" << endl;
@@ -1147,14 +1147,14 @@ void t_swift_3_generator::generate_swift_service_helpers(t_service* tservice) {
 
 string t_swift_3_generator::function_result_helper_struct_type(t_service *tservice, t_function* tfunction) {
   if (tfunction->is_oneway()) {
-    return definition_name(tservice->get_name()) + "_" + tfunction->get_name();
+    return tservice->get_name() + "_" + tfunction->get_name();
   } else {
-    return definition_name(tservice->get_name()) + "_" + tfunction->get_name() + "_result";
+    return tservice->get_name() + "_" + tfunction->get_name() + "_result";
   }
 }
 
 string t_swift_3_generator::function_args_helper_struct_type(t_service *tservice, t_function* tfunction) {
-  return definition_name(tservice->get_name()) + "_" + tfunction->get_name() + "_args";
+  return tservice->get_name() + "_" + tfunction->get_name() + "_args";
 }
 
 /**
@@ -1205,10 +1205,10 @@ void t_swift_3_generator::generate_swift_service_protocol(ofstream& out, t_servi
   string doc = tservice->get_doc();
   generate_docstring(out, doc);
 
-  indent(out) << "public protocol " << definition_name(tservice->get_name());
+  indent(out) << "public protocol " << type_name(tservice);
   t_service* parent = tservice->get_extends();
   if (parent != NULL) {
-    out << " : " << parent->get_name();
+    out << " : " << type_name(parent);
   }
   block_open(out);
   out << endl;
@@ -1236,7 +1236,7 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
   string doc = tservice->get_doc();
   generate_docstring(out, doc);
 
-  indent(out) << "public protocol " << definition_name(tservice->get_name()) << "Async";
+  indent(out) << "public protocol " << type_name(tservice) << "Async";
 
   block_open(out);
   out << endl;
@@ -1261,14 +1261,14 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
  */
 void t_swift_3_generator::generate_swift_service_client(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << definition_name(tservice->get_name()) << "Client";// : "
+  indent(out) << "open class " << type_name(tservice) << "Client";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
 
-  out << " : " << ((parent == NULL) ? "TClient" : parent->get_name() + "Client");
+  out << " : " << ((parent == NULL) ? "TClient" : type_name(parent) + "Client");
 
-  out <<  " /* , " << definition_name(tservice->get_name()) << " */";
+  out <<  " /* , " << type_name(tservice) << " */";
 
 
   block_open(out);
@@ -1286,13 +1286,13 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out, t_service
  */
 void t_swift_3_generator::generate_swift_service_client_async(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << definition_name(tservice->get_name()) << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
+  indent(out) << "open class " << type_name(tservice) << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
 
   out << " : " << ((parent == NULL) ? "T" :  parent->get_name()) + "AsyncClient<Protocol, Factory>";
-  out <<  " /* , " << definition_name(tservice->get_name()) << " */";
+  out <<  " /* , " << type_name(tservice) << " */";
 
   block_open(out);
 
@@ -1311,18 +1311,18 @@ void t_swift_3_generator::generate_swift_service_client_async(ofstream& out, t_s
  */
 void t_swift_3_generator::generate_swift_service_server(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << definition_name(tservice->get_name()) << "Processor /* " << definition_name(tservice->get_name()) << " */";
+  indent(out) << "open class " << type_name(tservice) << "Processor /* " << type_name(tservice) << " */";
 
   block_open(out);
 
   out << endl;
 
   out << indent() << "typealias ProcessorHandlerDictionary = "
-                  << "[String: (Int32, TProtocol, TProtocol, " << definition_name(tservice->get_name()) << ") throws -> Void]" << endl
+                  << "[String: (Int32, TProtocol, TProtocol, " << type_name(tservice) << ") throws -> Void]" << endl
       << endl
-      << indent() << "public var service: " << definition_name(tservice->get_name()) << endl
+      << indent() << "public var service: " << type_name(tservice) << endl
       << endl
-      << indent() << "public required init(service: " << definition_name(tservice->get_name()) << ")";
+      << indent() << "public required init(service: " << type_name(tservice) << ")";
   block_open(out);
   indent(out) << "self.service = service" << endl;
   block_close(out);
@@ -1352,7 +1352,7 @@ void t_swift_3_generator::generate_swift_service_client_send_function_implementa
                            "send_" + tfunction->get_name(),
                            tfunction->get_arglist());
 
-  string argsname = function_args_helper_struct_type(tservice, tfunction);
+  string argsname = definition_name(function_args_helper_struct_type(tservice, tfunction));
   t_struct* arg_struct = tfunction->get_arglist();
 
   // Open function
@@ -1428,7 +1428,7 @@ void t_swift_3_generator::generate_swift_service_client_recv_function_implementa
   }
 
   string return_type_name = type_name(tfunction->get_returntype());
-  out << "try " << resultname << ".read(from: inProtocol)" << endl;
+  out << "try " << definition_name(resultname) << ".read(from: inProtocol)" << endl;
 
   indent(out) << "try inProtocol.readMessageEnd()" << endl << endl;
 
@@ -1516,9 +1516,9 @@ void t_swift_3_generator::generate_swift_service_client_send_async_function_invo
  */
 void t_swift_3_generator::generate_swift_service_client_implementation(ofstream& out, t_service* tservice) {
 
-  string name = definition_name(tservice->get_name()) + "Client";
+  string name = type_name(tservice) + "Client";
 
-  indent(out) << "extension " << name << " : " << definition_name(tservice->get_name());
+  indent(out) << "extension " << name << " : " << type_name(tservice);
 
   block_open(out);
 
@@ -1569,8 +1569,8 @@ void t_swift_3_generator::generate_swift_service_client_implementation(ofstream&
  */
 void t_swift_3_generator::generate_swift_service_client_async_implementation(ofstream& out, t_service* tservice) {
 
-  string name = definition_name(tservice->get_name()) + "AsyncClient";
-  string protocol_name = definition_name(tservice->get_name()) + "Async";
+  string name = type_name(tservice) + "AsyncClient";
+  string protocol_name = type_name(tservice) + "Async";
 
   indent(out) << "extension " << name << " : " << protocol_name;
 
@@ -1666,7 +1666,7 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
 
 void t_swift_3_generator::generate_swift_service_server_implementation(ofstream& out, t_service* tservice) {
 
-  string name = definition_name(tservice->get_name()) + "Processor";
+  string name = type_name(tservice) + "Processor";
 
   indent(out) << "extension " << name << " : TProcessor";
   block_open(out);
@@ -1693,14 +1693,14 @@ void t_swift_3_generator::generate_swift_service_server_implementation(ofstream&
         << endl;
 
     indent_up();
-    out << indent() << "let args = try " << args_type << ".read(from: inProtocol)" << endl
+    out << indent() << "let args = try " << definition_name(args_type) << ".read(from: inProtocol)" << endl
         << endl
         << indent() << "try inProtocol.readMessageEnd()" << endl
         << endl;
 
     if (!tfunction->is_oneway() ) {
       string result_type = function_result_helper_struct_type(tservice, tfunction);
-      indent(out) << "var result = " << result_type << "()" << endl;
+      indent(out) << "var result = " << definition_name(result_type) << "()" << endl;
 
       indent(out) << "do";
       block_open(out);
@@ -1734,7 +1734,7 @@ void t_swift_3_generator::generate_swift_service_server_implementation(ofstream&
       vector<t_field*>::const_iterator x_iter;
 
       for (x_iter = xfields.begin(); x_iter != xfields.end(); ++x_iter) {
-        indent(out) << "catch let error as " << (*x_iter)->get_type()->get_name();
+        indent(out) << "catch let error as " << type_name((*x_iter)->get_type());
         out << " { result." << (*x_iter)->get_name() << " = error }" << endl;
       }
 

@@ -1147,14 +1147,14 @@ void t_swift_3_generator::generate_swift_service_helpers(t_service* tservice) {
 
 string t_swift_3_generator::function_result_helper_struct_type(t_service *tservice, t_function* tfunction) {
   if (tfunction->is_oneway()) {
-    return tservice->get_name() + "_" + tfunction->get_name();
+    return definition_name(tservice->get_name()) + "_" + tfunction->get_name();
   } else {
-    return tservice->get_name() + "_" + tfunction->get_name() + "_result";
+    return definition_name(tservice->get_name()) + "_" + tfunction->get_name() + "_result";
   }
 }
 
 string t_swift_3_generator::function_args_helper_struct_type(t_service *tservice, t_function* tfunction) {
-  return tservice->get_name() + "_" + tfunction->get_name() + "_args";
+  return definition_name(tservice->get_name()) + "_" + tfunction->get_name() + "_args";
 }
 
 /**
@@ -1205,7 +1205,7 @@ void t_swift_3_generator::generate_swift_service_protocol(ofstream& out, t_servi
   string doc = tservice->get_doc();
   generate_docstring(out, doc);
 
-  indent(out) << "public protocol " << tservice->get_name();
+  indent(out) << "public protocol " << definition_name(tservice->get_name());
   t_service* parent = tservice->get_extends();
   if (parent != NULL) {
     out << " : " << parent->get_name();
@@ -1236,7 +1236,7 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
   string doc = tservice->get_doc();
   generate_docstring(out, doc);
 
-  indent(out) << "public protocol " << tservice->get_name() << "Async";
+  indent(out) << "public protocol " << definition_name(tservice->get_name()) << "Async";
 
   block_open(out);
   out << endl;
@@ -1261,14 +1261,14 @@ void t_swift_3_generator::generate_swift_service_protocol_async(ofstream& out, t
  */
 void t_swift_3_generator::generate_swift_service_client(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << tservice->get_name() << "Client";// : "
+  indent(out) << "open class " << definition_name(tservice->get_name()) << "Client";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
 
   out << " : " << ((parent == NULL) ? "TClient" : parent->get_name() + "Client");
 
-  out <<  " /* , " << tservice->get_name() << " */";
+  out <<  " /* , " << definition_name(tservice->get_name()) << " */";
 
 
   block_open(out);
@@ -1286,13 +1286,13 @@ void t_swift_3_generator::generate_swift_service_client(ofstream& out, t_service
  */
 void t_swift_3_generator::generate_swift_service_client_async(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << tservice->get_name() << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
+  indent(out) << "open class " << definition_name(tservice->get_name()) << "AsyncClient<Protocol: TProtocol, Factory: TAsyncTransportFactory>";// : "
 
   // Inherit from ParentClient
   t_service* parent = tservice->get_extends();
 
   out << " : " << ((parent == NULL) ? "T" :  parent->get_name()) + "AsyncClient<Protocol, Factory>";
-  out <<  " /* , " << tservice->get_name() << " */";
+  out <<  " /* , " << definition_name(tservice->get_name()) << " */";
 
   block_open(out);
 
@@ -1311,18 +1311,18 @@ void t_swift_3_generator::generate_swift_service_client_async(ofstream& out, t_s
  */
 void t_swift_3_generator::generate_swift_service_server(ofstream& out, t_service* tservice) {
 
-  indent(out) << "open class " << tservice->get_name() << "Processor /* " << tservice->get_name() << " */";
+  indent(out) << "open class " << definition_name(tservice->get_name()) << "Processor /* " << definition_name(tservice->get_name()) << " */";
 
   block_open(out);
 
   out << endl;
 
   out << indent() << "typealias ProcessorHandlerDictionary = "
-                  << "[String: (Int32, TProtocol, TProtocol, " << tservice->get_name() << ") throws -> Void]" << endl
+                  << "[String: (Int32, TProtocol, TProtocol, " << definition_name(tservice->get_name()) << ") throws -> Void]" << endl
       << endl
-      << indent() << "public var service: " << tservice->get_name() << endl
+      << indent() << "public var service: " << definition_name(tservice->get_name()) << endl
       << endl
-      << indent() << "public required init(service: " << tservice->get_name() << ")";
+      << indent() << "public required init(service: " << definition_name(tservice->get_name()) << ")";
   block_open(out);
   indent(out) << "self.service = service" << endl;
   block_close(out);
@@ -1516,9 +1516,9 @@ void t_swift_3_generator::generate_swift_service_client_send_async_function_invo
  */
 void t_swift_3_generator::generate_swift_service_client_implementation(ofstream& out, t_service* tservice) {
 
-  string name = tservice->get_name() + "Client";
+  string name = definition_name(tservice->get_name()) + "Client";
 
-  indent(out) << "extension " << name << " : " << tservice->get_name();
+  indent(out) << "extension " << name << " : " << definition_name(tservice->get_name());
 
   block_open(out);
 
@@ -1569,8 +1569,8 @@ void t_swift_3_generator::generate_swift_service_client_implementation(ofstream&
  */
 void t_swift_3_generator::generate_swift_service_client_async_implementation(ofstream& out, t_service* tservice) {
 
-  string name = tservice->get_name() + "AsyncClient";
-  string protocol_name = tservice->get_name() + "Async";
+  string name = definition_name(tservice->get_name()) + "AsyncClient";
+  string protocol_name = definition_name(tservice->get_name()) + "Async";
 
   indent(out) << "extension " << name << " : " << protocol_name;
 
@@ -1666,7 +1666,7 @@ void t_swift_3_generator::generate_swift_service_client_async_implementation(ofs
 
 void t_swift_3_generator::generate_swift_service_server_implementation(ofstream& out, t_service* tservice) {
 
-  string name = tservice->get_name() + "Processor";
+  string name = definition_name(tservice->get_name()) + "Processor";
 
   indent(out) << "extension " << name << " : TProcessor";
   block_open(out);

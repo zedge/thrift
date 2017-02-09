@@ -1922,7 +1922,7 @@ void t_swift_3_generator::render_const_value(ostream& out, t_type* type, t_const
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    string enum_value = value->get_identifier_with_parent();
+    string enum_value = enum_const_name(value->get_identifier_with_parent());
     if (prefix_namespace_) {
       t_program* program = type->get_program();
       if (program) {

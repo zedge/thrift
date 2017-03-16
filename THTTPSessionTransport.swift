@@ -109,17 +109,26 @@ public class THTTPSessionTransport: TAsyncTransport {
     request.httpBody =  requestData
 
     requestData = Data()
-
     do {
       task = try factory.taskWithRequest(request, completionHandler: { (data, response, taskError) in
-        
+
+        // Check if there was an error with the network
+        if taskError != nil {
+            error = TTransportError(error: .timedOut)
+            completed(self, error)
+            return
+        }
+
         // Check response type
         if taskError == nil && !(response is HTTPURLResponse) {
           error = THTTPTransportError(error: .invalidResponse)
+        completed(self, error)
+            return
+
         }
-        
         // Check status code
         if let httpResponse = response as? HTTPURLResponse {
+
           if taskError == nil && httpResponse.statusCode != 200 {
             if httpResponse.statusCode == 401 {
               error = THTTPTransportError(error: .authentication)
@@ -146,28 +155,29 @@ public class THTTPSessionTransport: TAsyncTransport {
           completed(self, error)
         }
       })
-      
+
     } catch let taskError {
       error = taskError
     }
-    
+
     if let error = error, task == nil {
       completed(self, error)
     }
+
     task?.resume()
   }
 
   public func flush() throws {
     let completed = DispatchSemaphore(value: 0)
     var internalError: Error?
-    
+
     flush() { _, error in
       internalError = error
       completed.signal()
     }
-    
+
     _ = completed.wait(timeout: DispatchTime.distantFuture)
-    
+
     if let error = internalError {
       throw error
     }

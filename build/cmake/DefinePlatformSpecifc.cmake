@@ -17,6 +17,8 @@
 # under the License.
 #
 
+# Uncomment this to show some basic cmake variables about platforms
+# include (NewPlatformDebug)
 
 # Visual Studio specific options
 if(MSVC)
@@ -96,16 +98,23 @@ elseif(WITH_STDTHREADS)
   add_definitions("-DUSE_STD_THREAD=1")
 endif()
 
-# GCC and Clang.
-if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  # FIXME -pedantic can not be used at the moment because of: https://issues.apache.org/jira/browse/THRIFT-2784
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wextra -pedantic")
-  # FIXME enabling c++11 breaks some Linux builds on Travis by triggering a g++ bug, see
-  # https://travis-ci.org/apache/thrift/jobs/58017022
-  # on the other hand, both MacOSX and FreeBSD need c++11
-  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin" OR ${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wextra")
+# C++ Language Level
+set(CXX_LANGUAGE_LEVEL "C++${CMAKE_CXX_STANDARD}")
+if (CMAKE_CXX_STANDARD_REQUIRED)
+  string(CONCAT CXX_LANGUAGE_LEVEL "${CXX_LANGUAGE_LEVEL} [compiler must support it]")
+else()
+  string(CONCAT CXX_LANGUAGE_LEVEL "${CXX_LANGUAGE_LEVEL} [fallback to earlier if compiler does not support it]")
+endif()
+if (CMAKE_CXX_EXTENSIONS)
+  string(CONCAT CXX_LANGUAGE_LEVEL "${CXX_LANGUAGE_LEVEL} [with compiler-specific extensions]")
+else()
+  if ((CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND NOT MINGW)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-variadic-macros -Wno-long-long -Wno-c++11-long-long")
   endif()
+endif()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register")
 endif()
 
 # If gcc older than 4.8 is detected and plugin support was requested, fail fast

@@ -47,7 +47,14 @@ func NewTServerSocketTimeout(listenAddr string, clientTimeout time.Duration) (*T
 	return &TServerSocket{addr: addr, clientTimeout: clientTimeout}, nil
 }
 
+// Creates a TServerSocket from a net.Addr
+func NewTServerSocketFromAddrTimeout(addr net.Addr, clientTimeout time.Duration) *TServerSocket {
+	return &TServerSocket{addr: addr, clientTimeout: clientTimeout}
+}
+
 func (p *TServerSocket) Listen() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.IsListening() {
 		return nil
 	}
@@ -61,10 +68,9 @@ func (p *TServerSocket) Listen() error {
 
 func (p *TServerSocket) Accept() (TTransport, error) {
 	p.mu.RLock()
-	interrupted := p.interrupted
-	p.mu.RUnlock()
+	defer p.mu.RUnlock()
 
-	if interrupted {
+	if p.interrupted {
 		return nil, errTransportInterrupted
 	}
 	if p.listener == nil {
@@ -84,6 +90,8 @@ func (p *TServerSocket) IsListening() bool {
 
 // Connects the socket, creating a new socket object if necessary.
 func (p *TServerSocket) Open() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.IsListening() {
 		return NewTTransportException(ALREADY_OPEN, "Server socket already open")
 	}
@@ -114,9 +122,9 @@ func (p *TServerSocket) Close() error {
 
 func (p *TServerSocket) Interrupt() error {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.interrupted = true
 	p.Close()
-	p.mu.Unlock()
 
 	return nil
 }

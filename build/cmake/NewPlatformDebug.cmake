@@ -17,7 +17,27 @@
 # under the License.
 #
 
-all:
-	cd src; make; cd ..
-clean:
-	cd src; make clean; cd ..
+#
+# For debugging new platforms, just to see what some environment flags are...
+#
+macro(SHOWFLAG flag)
+  message(STATUS "${flag} = ${${flag}}")
+endmacro(SHOWFLAG)
+
+set(NEWPLATFORMDEBUG ON)
+
+if(NEWPLATFORMDEBUG)
+  SHOWFLAG("APPLE")
+  SHOWFLAG("BORLAND")
+  SHOWFLAG("CMAKE_C_COMPILER_ID")
+  SHOWFLAG("CMAKE_CXX_COMPILER_ID")
+  SHOWFLAG("CMAKE_COMPILER_IS_GNUCC")
+  SHOWFLAG("CMAKE_COMPILER_IS_GNUCXX")
+  SHOWFLAG("CYGWIN")
+  SHOWFLAG("MINGW")
+  SHOWFLAG("MSVC")
+  SHOWFLAG("MSYS")
+  SHOWFLAG("UNIX")
+  SHOWFLAG("WATCOM")
+  SHOWFLAG("WIN32")
+endif(NEWPLATFORMDEBUG)

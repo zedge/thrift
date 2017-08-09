@@ -64,6 +64,8 @@ public:
     gen_templates_ = false;
     gen_templates_only_ = false;
     gen_moveable_ = false;
+    gen_no_ostream_operators_ = false;
+
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("pure_enums") == 0) {
         gen_pure_enums_ = true;
@@ -80,6 +82,8 @@ public:
         gen_templates_only_ = (iter->second == "only");
       } else if( iter->first.compare("moveable_types") == 0) {
         gen_moveable_ = true;
+      } else if ( iter->first.compare("no_ostream_operators") == 0) {
+        gen_no_ostream_operators_ = true;
       } else {
         throw "unknown option cpp:" + iter->first;
       }
@@ -103,6 +107,8 @@ public:
 
   void generate_typedef(t_typedef* ttypedef);
   void generate_enum(t_enum* tenum);
+  void generate_enum_ostream_operator_decl(std::ofstream& out, t_enum* tenum);
+  void generate_enum_ostream_operator(std::ofstream& out, t_enum* tenum);
   void generate_forward_declaration(t_struct* tstruct);
   void generate_struct(t_struct* tstruct) { generate_cpp_struct(tstruct, false); }
   void generate_xception(t_struct* txception) { generate_cpp_struct(txception, true); }
@@ -127,7 +133,8 @@ public:
   void generate_struct_definition(std::ofstream& out,
                                   std::ofstream& force_cpp_out,
                                   t_struct* tstruct,
-                                  bool setters = true);
+                                  bool setters = true,
+                                  bool is_user_struct = false);
   void generate_copy_constructor(std::ofstream& out, t_struct* tstruct, bool is_exception);
   void generate_move_constructor(std::ofstream& out, t_struct* tstruct, bool is_exception);
   void generate_constructor_helper(std::ofstream& out,
@@ -242,6 +249,7 @@ public:
                                    const char* suffix,
                                    bool include_values);
 
+  void generate_struct_ostream_operator_decl(std::ofstream& f, t_struct* tstruct);
   void generate_struct_ostream_operator(std::ofstream& f, t_struct* tstruct);
   void generate_struct_print_method_decl(std::ofstream& f, t_struct* tstruct);
   void generate_exception_what_method_decl(std::ofstream& f,
@@ -259,6 +267,22 @@ public:
   }
 
   void set_use_include_prefix(bool use_include_prefix) { use_include_prefix_ = use_include_prefix; }
+
+  /**
+   * The compiler option "no_thrift_ostream_impl" can be used to prevent
+   * the compiler from emitting implementations for operator <<.  In this
+   * case the consuming application must provide any needed to build.
+   *
+   * To disable this on a per structure bases, one can alternatively set
+   * the annotation "cpp.customostream" to prevent thrift from emitting an
+   * operator << (std::ostream&).
+   *
+   * See AnnotationTest for validation of this annotation feature.
+   */
+  bool has_custom_ostream(t_type* ttype) const {
+    return (gen_no_ostream_operators_) ||
+           (ttype->annotations_.find("cpp.customostream") != ttype->annotations_.end());
+  }
 
 private:
   /**
@@ -287,6 +311,11 @@ private:
    * True if we should generate move constructors & assignment operators.
    */
   bool gen_moveable_;
+
+  /**
+   * True if we should generate ostream definitions
+   */
+  bool gen_no_ostream_operators_;
 
   /**
    * True iff we should use a path prefix in our #include statements for other
@@ -541,6 +570,54 @@ void t_cpp_generator::generate_enum(t_enum* tenum) {
                 << tenum->get_name() << "Values"
                 << ", _k" << tenum->get_name() << "Names), "
                 << "::apache::thrift::TEnumIterator(-1, NULL, NULL));" << endl << endl;
+
+  generate_enum_ostream_operator_decl(f_types_, tenum);
+  generate_enum_ostream_operator(f_types_impl_, tenum);
+}
+
+void t_cpp_generator::generate_enum_ostream_operator_decl(std::ofstream& out, t_enum* tenum) {
+
+  out << "std::ostream& operator<<(std::ostream& out, const ";
+  if (gen_pure_enums_) {
+    out << tenum->get_name();
+  } else {
+    out << tenum->get_name() << "::type&";
+  }
+  out << " val);" << endl;
+  out << endl;
+}
+
+void t_cpp_generator::generate_enum_ostream_operator(std::ofstream& out, t_enum* tenum) {
+
+  // If we've been told the consuming application will provide an ostream
+  // operator definition then we only make a declaration:
+
+  if (!has_custom_ostream(tenum)) {
+    out << "std::ostream& operator<<(std::ostream& out, const ";
+    if (gen_pure_enums_) {
+      out << tenum->get_name();
+    } else {
+      out << tenum->get_name() << "::type&";
+    }
+    out << " val) ";
+    scope_up(out);
+
+    out << indent() << "std::map<int, const char*>::const_iterator it = _"
+             << tenum->get_name() << "_VALUES_TO_NAMES.find(val);" << endl;
+    out << indent() << "if (it != _" << tenum->get_name() << "_VALUES_TO_NAMES.end()) {" << endl;
+    indent_up();
+    out << indent() << "out << it->second;" << endl;
+    indent_down();
+    out << indent() << "} else {" << endl;
+    indent_up();
+    out << indent() << "out << static_cast<int>(val);" << endl;
+    indent_down();
+    out << indent() << "}" << endl;
+
+    out << indent() << "return out;" << endl;
+    scope_down(out);
+    out << endl;
+  }
 }
 
 /**
@@ -737,7 +814,7 @@ void t_cpp_generator::generate_forward_declaration(t_struct* tstruct) {
  */
 void t_cpp_generator::generate_cpp_struct(t_struct* tstruct, bool is_exception) {
   generate_struct_declaration(f_types_, tstruct, is_exception, false, true, true, true, true);
-  generate_struct_definition(f_types_impl_, f_types_impl_, tstruct);
+  generate_struct_definition(f_types_impl_, f_types_impl_, tstruct, true, true);
 
   std::ofstream& out = (gen_templates_ ? f_types_tcc_ : f_types_impl_);
   generate_struct_reader(out, tstruct);
@@ -751,7 +828,11 @@ void t_cpp_generator::generate_cpp_struct(t_struct* tstruct, bool is_exception) 
   if (gen_moveable_) {
     generate_move_assignment_operator(f_types_impl_, tstruct);
   }
-  generate_struct_print_method(f_types_impl_, tstruct);
+
+  if (!has_custom_ostream(tstruct)) {
+    generate_struct_print_method(f_types_impl_, tstruct);
+  }
+
   if (is_exception) {
     generate_exception_what_method(f_types_impl_, tstruct);
   }
@@ -1094,7 +1175,7 @@ void t_cpp_generator::generate_struct_declaration(ofstream& out,
   }
   out << endl;
 
-  if (is_user_struct) {
+  if (is_user_struct && !has_custom_ostream(tstruct)) {
     out << indent() << "virtual ";
     generate_struct_print_method_decl(out, NULL);
     out << ";" << endl;
@@ -1118,14 +1199,15 @@ void t_cpp_generator::generate_struct_declaration(ofstream& out,
   }
 
   if (is_user_struct) {
-    generate_struct_ostream_operator(out, tstruct);
+    generate_struct_ostream_operator_decl(out, tstruct);
   }
 }
 
 void t_cpp_generator::generate_struct_definition(ofstream& out,
                                                  ofstream& force_cpp_out,
                                                  t_struct* tstruct,
-                                                 bool setters) {
+                                                 bool setters,
+                                                 bool is_user_struct) {
   // Get members
   vector<t_field*>::const_iterator m_iter;
   const vector<t_field*>& members = tstruct->get_members();
@@ -1166,6 +1248,9 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
       }
       out << indent() << "}" << endl;
     }
+  }
+  if (is_user_struct) {
+    generate_struct_ostream_operator(out, tstruct);
   }
   out << endl;
 }
@@ -1466,15 +1551,25 @@ void t_cpp_generator::generate_struct_swap(ofstream& out, t_struct* tstruct) {
   out << endl;
 }
 
-void t_cpp_generator::generate_struct_ostream_operator(std::ofstream& out, t_struct* tstruct) {
-  out << "inline std::ostream& operator<<(std::ostream& out, const "
+void t_cpp_generator::generate_struct_ostream_operator_decl(std::ofstream& out, t_struct* tstruct) {
+  out << "std::ostream& operator<<(std::ostream& out, const "
       << tstruct->get_name()
-      << "& obj)" << endl;
-  scope_up(out);
-  out << indent() << "obj.printTo(out);" << endl
-      << indent() << "return out;" << endl;
-  scope_down(out);
+      << "& obj);" << endl;
   out << endl;
+}
+
+void t_cpp_generator::generate_struct_ostream_operator(std::ofstream& out, t_struct* tstruct) {
+  if (!has_custom_ostream(tstruct)) {
+    // thrift defines this behavior
+    out << "std::ostream& operator<<(std::ostream& out, const "
+        << tstruct->get_name()
+        << "& obj)" << endl;
+    scope_up(out);
+    out << indent() << "obj.printTo(out);" << endl
+        << indent() << "return out;" << endl;
+    scope_down(out);
+    out << endl;
+  }
 }
 
 void t_cpp_generator::generate_struct_print_method_decl(std::ofstream& out, t_struct* tstruct) {
@@ -1632,7 +1727,7 @@ void t_cpp_generator::generate_service(t_service* tservice) {
 
   f_header_ << endl << ns_open_ << endl << endl;
 
-  f_header_ << "#ifdef _WIN32\n"
+  f_header_ << "#ifdef _MSC_VER\n"
                "  #pragma warning( push )\n"
                "  #pragma warning (disable : 4250 ) //inheriting methods via dominance \n"
                "#endif\n\n";
@@ -1688,7 +1783,7 @@ void t_cpp_generator::generate_service(t_service* tservice) {
     generate_service_async_skeleton(tservice);
   }
 
-  f_header_ << "#ifdef _WIN32\n"
+  f_header_ << "#ifdef _MSC_VER\n"
                "  #pragma warning( pop )\n"
                "#endif\n\n";
 
@@ -3639,7 +3734,7 @@ void t_cpp_generator::generate_deserialize_field(ofstream& out,
       throw "compiler error: cannot serialize void field in a struct: " + name;
       break;
     case t_base_type::TYPE_STRING:
-      if (((t_base_type*)type)->is_binary()) {
+      if (type->is_binary()) {
         out << "readBinary(" << name << ");";
       } else {
         out << "readString(" << name << ");";
@@ -3846,7 +3941,7 @@ void t_cpp_generator::generate_serialize_field(ofstream& out,
         throw "compiler error: cannot serialize void field in a struct: " + name;
         break;
       case t_base_type::TYPE_STRING:
-        if (((t_base_type*)type)->is_binary()) {
+        if (type->is_binary()) {
           out << "writeBinary(" << name << ");";
         } else {
           out << "writeString(" << name << ");";
@@ -4371,4 +4466,6 @@ THRIFT_REGISTER_GENERATOR(
     "    templates:       Generate templatized reader/writer methods.\n"
     "    pure_enums:      Generate pure enums instead of wrapper classes.\n"
     "    include_prefix:  Use full include paths in generated files.\n"
-    "    moveable_types:  Generate move constructors and assignment operators.\n")
+    "    moveable_types:  Generate move constructors and assignment operators.\n"
+    "    no_ostream_operators:\n"
+    "                     Omit generation of ostream definitions.\n")

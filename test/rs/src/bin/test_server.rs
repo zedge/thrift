@@ -16,6 +16,10 @@
 // under the License.
 
 #[macro_use]
+extern crate log;
+extern crate env_logger;
+
+#[macro_use]
 extern crate clap;
 extern crate ordered_float;
 extern crate thrift;
@@ -29,15 +33,21 @@ use std::time::Duration;
 use thrift::protocol::{TBinaryInputProtocolFactory, TBinaryOutputProtocolFactory,
                        TCompactInputProtocolFactory, TCompactOutputProtocolFactory,
                        TInputProtocolFactory, TOutputProtocolFactory};
-use thrift::server::TSimpleServer;
-use thrift::transport::{TBufferedTransportFactory, TFramedTransportFactory, TTransportFactory};
+use thrift::server::{TMultiplexedProcessor, TServer};
+use thrift::transport::{TBufferedReadTransportFactory, TBufferedWriteTransportFactory,
+                        TFramedReadTransportFactory, TFramedWriteTransportFactory,
+                        TReadTransportFactory, TWriteTransportFactory};
 use thrift_test::*;
 
 fn main() {
+    env_logger::init().expect("logger setup failed");
+
+    debug!("initialized logger - running cross-test server");
+
     match run() {
-        Ok(()) => println!("cross-test server succeeded"),
+        Ok(()) => info!("cross-test server succeeded"),
         Err(e) => {
-            println!("cross-test server failed with error {:?}", e);
+            info!("cross-test server failed with error {:?}", e);
             std::process::exit(1);
         }
     }
@@ -49,7 +59,6 @@ fn run() -> thrift::Result<()> {
     // --domain-socket
     // --named-pipe
     // --ssl
-    // --workers
     let matches = clap_app!(rust_test_client =>
         (version: "1.0")
         (author: "Apache Thrift Developers <dev@thrift.apache.org>")
@@ -57,38 +66,44 @@ fn run() -> thrift::Result<()> {
         (@arg port: --port +takes_value "port on which the test server listens")
         (@arg transport: --transport +takes_value "transport implementation to use (\"buffered\", \"framed\")")
         (@arg protocol: --protocol +takes_value "protocol implementation to use (\"binary\", \"compact\")")
-        (@arg server_type: --server_type +takes_value "type of server instantiated (\"simple\", \"thread-pool\", \"threaded\", \"non-blocking\")")
-    ).get_matches();
+        (@arg server_type: --server_type +takes_value "type of server instantiated (\"simple\", \"thread-pool\")")
+        (@arg workers: -n --workers +takes_value "number of thread-pool workers (\"4\")")
+    )
+            .get_matches();
 
     let port = value_t!(matches, "port", u16).unwrap_or(9090);
     let transport = matches.value_of("transport").unwrap_or("buffered");
     let protocol = matches.value_of("protocol").unwrap_or("binary");
-    let server_type = matches.value_of("server_type").unwrap_or("simple");
+    let server_type = matches.value_of("server_type").unwrap_or("thread-pool");
+    let workers = value_t!(matches, "workers", usize).unwrap_or(4);
     let listen_address = format!("127.0.0.1:{}", port);
 
-    println!("binding to {}", listen_address);
+    info!("binding to {}", listen_address);
 
-    let (i_transport_factory, o_transport_factory): (Box<TTransportFactory>,
-                                                     Box<TTransportFactory>) = match &*transport {
-        "buffered" => {
-            (Box::new(TBufferedTransportFactory::new()), Box::new(TBufferedTransportFactory::new()))
-        }
-        "framed" => {
-            (Box::new(TFramedTransportFactory::new()), Box::new(TFramedTransportFactory::new()))
-        }
-        unknown => {
-            return Err(format!("unsupported transport type {}", unknown).into());
-        }
-    };
+    let (i_transport_factory, o_transport_factory): (Box<TReadTransportFactory>,
+                                                     Box<TWriteTransportFactory>) =
+        match &*transport {
+            "buffered" => {
+                (Box::new(TBufferedReadTransportFactory::new()),
+                 Box::new(TBufferedWriteTransportFactory::new()))
+            }
+            "framed" => {
+                (Box::new(TFramedReadTransportFactory::new()),
+                 Box::new(TFramedWriteTransportFactory::new()))
+            }
+            unknown => {
+                return Err(format!("unsupported transport type {}", unknown).into());
+            }
+        };
 
     let (i_protocol_factory, o_protocol_factory): (Box<TInputProtocolFactory>,
                                                    Box<TOutputProtocolFactory>) =
         match &*protocol {
-            "binary" => {
+            "binary" | "multi" | "multi:binary" => {
                 (Box::new(TBinaryInputProtocolFactory::new()),
                  Box::new(TBinaryOutputProtocolFactory::new()))
             }
-            "compact" => {
+            "compact" | "multic" | "multi:compact" => {
                 (Box::new(TCompactInputProtocolFactory::new()),
                  Box::new(TCompactOutputProtocolFactory::new()))
             }
@@ -97,116 +112,136 @@ fn run() -> thrift::Result<()> {
             }
         };
 
-    let processor = ThriftTestSyncProcessor::new(ThriftTestSyncHandlerImpl {});
+    let test_processor = ThriftTestSyncProcessor::new(ThriftTestSyncHandlerImpl {});
 
-    let mut server = match &*server_type {
-        "simple" => {
-            TSimpleServer::new(i_transport_factory,
-                               i_protocol_factory,
-                               o_transport_factory,
-                               o_protocol_factory,
-                               processor)
-        }
-        unknown => {
-            return Err(format!("unsupported server type {}", unknown).into());
-        }
-    };
+    match &*server_type {
+        "simple" | "thread-pool" => {
+            if protocol == "multi" || protocol == "multic" {
+                let second_service_processor = SecondServiceSyncProcessor::new(SecondServiceSyncHandlerImpl {},);
 
-    server.listen(&listen_address)
+                let mut multiplexed_processor = TMultiplexedProcessor::new();
+                multiplexed_processor
+                    .register("ThriftTest", Box::new(test_processor), true)?;
+                multiplexed_processor
+                    .register("SecondService", Box::new(second_service_processor), false)?;
+
+                let mut server = TServer::new(
+                    i_transport_factory,
+                    i_protocol_factory,
+                    o_transport_factory,
+                    o_protocol_factory,
+                    multiplexed_processor,
+                    workers,
+                );
+
+                server.listen(&listen_address)
+            } else {
+                let mut server = TServer::new(
+                    i_transport_factory,
+                    i_protocol_factory,
+                    o_transport_factory,
+                    o_protocol_factory,
+                    test_processor,
+                    workers,
+                );
+
+                server.listen(&listen_address)
+            }
+        }
+        unknown => Err(format!("unsupported server type {}", unknown).into()),
+    }
 }
 
 struct ThriftTestSyncHandlerImpl;
 impl ThriftTestSyncHandler for ThriftTestSyncHandlerImpl {
-    fn handle_test_void(&mut self) -> thrift::Result<()> {
-        println!("testVoid()");
+    fn handle_test_void(&self) -> thrift::Result<()> {
+        info!("testVoid()");
         Ok(())
     }
 
-    fn handle_test_string(&mut self, thing: String) -> thrift::Result<String> {
-        println!("testString({})", &thing);
+    fn handle_test_string(&self, thing: String) -> thrift::Result<String> {
+        info!("testString({})", &thing);
         Ok(thing)
     }
 
-    fn handle_test_bool(&mut self, thing: bool) -> thrift::Result<bool> {
-        println!("testBool({})", thing);
+    fn handle_test_bool(&self, thing: bool) -> thrift::Result<bool> {
+        info!("testBool({})", thing);
         Ok(thing)
     }
 
-    fn handle_test_byte(&mut self, thing: i8) -> thrift::Result<i8> {
-        println!("testByte({})", thing);
+    fn handle_test_byte(&self, thing: i8) -> thrift::Result<i8> {
+        info!("testByte({})", thing);
         Ok(thing)
     }
 
-    fn handle_test_i32(&mut self, thing: i32) -> thrift::Result<i32> {
-        println!("testi32({})", thing);
+    fn handle_test_i32(&self, thing: i32) -> thrift::Result<i32> {
+        info!("testi32({})", thing);
         Ok(thing)
     }
 
-    fn handle_test_i64(&mut self, thing: i64) -> thrift::Result<i64> {
-        println!("testi64({})", thing);
+    fn handle_test_i64(&self, thing: i64) -> thrift::Result<i64> {
+        info!("testi64({})", thing);
         Ok(thing)
     }
 
-    fn handle_test_double(&mut self,
-                          thing: OrderedFloat<f64>)
-                          -> thrift::Result<OrderedFloat<f64>> {
-        println!("testDouble({})", thing);
+    fn handle_test_double(&self, thing: OrderedFloat<f64>) -> thrift::Result<OrderedFloat<f64>> {
+        info!("testDouble({})", thing);
         Ok(thing)
     }
 
-    fn handle_test_binary(&mut self, thing: Vec<u8>) -> thrift::Result<Vec<u8>> {
-        println!("testBinary({:?})", thing);
+    fn handle_test_binary(&self, thing: Vec<u8>) -> thrift::Result<Vec<u8>> {
+        info!("testBinary({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_struct(&mut self, thing: Xtruct) -> thrift::Result<Xtruct> {
-        println!("testStruct({:?})", thing);
+    fn handle_test_struct(&self, thing: Xtruct) -> thrift::Result<Xtruct> {
+        info!("testStruct({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_nest(&mut self, thing: Xtruct2) -> thrift::Result<Xtruct2> {
-        println!("testNest({:?})", thing);
+    fn handle_test_nest(&self, thing: Xtruct2) -> thrift::Result<Xtruct2> {
+        info!("testNest({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_map(&mut self, thing: BTreeMap<i32, i32>) -> thrift::Result<BTreeMap<i32, i32>> {
-        println!("testMap({:?})", thing);
+    fn handle_test_map(&self, thing: BTreeMap<i32, i32>) -> thrift::Result<BTreeMap<i32, i32>> {
+        info!("testMap({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_string_map(&mut self,
-                              thing: BTreeMap<String, String>)
-                              -> thrift::Result<BTreeMap<String, String>> {
-        println!("testStringMap({:?})", thing);
+    fn handle_test_string_map(
+        &self,
+        thing: BTreeMap<String, String>,
+    ) -> thrift::Result<BTreeMap<String, String>> {
+        info!("testStringMap({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_set(&mut self, thing: BTreeSet<i32>) -> thrift::Result<BTreeSet<i32>> {
-        println!("testSet({:?})", thing);
+    fn handle_test_set(&self, thing: BTreeSet<i32>) -> thrift::Result<BTreeSet<i32>> {
+        info!("testSet({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_list(&mut self, thing: Vec<i32>) -> thrift::Result<Vec<i32>> {
-        println!("testList({:?})", thing);
+    fn handle_test_list(&self, thing: Vec<i32>) -> thrift::Result<Vec<i32>> {
+        info!("testList({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_enum(&mut self, thing: Numberz) -> thrift::Result<Numberz> {
-        println!("testEnum({:?})", thing);
+    fn handle_test_enum(&self, thing: Numberz) -> thrift::Result<Numberz> {
+        info!("testEnum({:?})", thing);
         Ok(thing)
     }
 
-    fn handle_test_typedef(&mut self, thing: UserId) -> thrift::Result<UserId> {
-        println!("testTypedef({})", thing);
+    fn handle_test_typedef(&self, thing: UserId) -> thrift::Result<UserId> {
+        info!("testTypedef({})", thing);
         Ok(thing)
     }
 
     /// @return map<i32,map<i32,i32>> - returns a dictionary with these values:
-    /// {-4 => {-4 => -4, -3 => -3, -2 => -2, -1 => -1, }, 4 => {1 => 1, 2 => 2, 3 => 3, 4 => 4, }, }
-    fn handle_test_map_map(&mut self,
-                           hello: i32)
-                           -> thrift::Result<BTreeMap<i32, BTreeMap<i32, i32>>> {
-        println!("testMapMap({})", hello);
+    /// {-4 => {-4 => -4, -3 => -3, -2 => -2, -1 => -1, }, 4 => {1 => 1, 2 =>
+    /// 2, 3 => 3, 4 => 4, }, }
+    fn handle_test_map_map(&self, hello: i32) -> thrift::Result<BTreeMap<i32, BTreeMap<i32, i32>>> {
+        info!("testMapMap({})", hello);
 
         let mut inner_map_0: BTreeMap<i32, i32> = BTreeMap::new();
         for i in -4..(0 as i32) {
@@ -232,10 +267,11 @@ impl ThriftTestSyncHandler for ThriftTestSyncHandlerImpl {
     ///       2 => { 6 => <empty Insanity struct>, },
     ///     }
     /// return map<UserId, map<Numberz,Insanity>> - a map with the above values
-    fn handle_test_insanity(&mut self,
-                            argument: Insanity)
-                            -> thrift::Result<BTreeMap<UserId, BTreeMap<Numberz, Insanity>>> {
-        println!("testInsanity({:?})", argument);
+    fn handle_test_insanity(
+        &self,
+        argument: Insanity,
+    ) -> thrift::Result<BTreeMap<UserId, BTreeMap<Numberz, Insanity>>> {
+        info!("testInsanity({:?})", argument);
         let mut map_0: BTreeMap<Numberz, Insanity> = BTreeMap::new();
         map_0.insert(Numberz::TWO, argument.clone());
         map_0.insert(Numberz::THREE, argument.clone());
@@ -254,15 +290,18 @@ impl ThriftTestSyncHandler for ThriftTestSyncHandlerImpl {
         Ok(ret)
     }
 
-    /// returns an Xtruct with string_thing = "Hello2", byte_thing = arg0, i32_thing = arg1 and i64_thing = arg2
-    fn handle_test_multi(&mut self,
-                         arg0: i8,
-                         arg1: i32,
-                         arg2: i64,
-                         _: BTreeMap<i16, String>,
-                         _: Numberz,
-                         _: UserId)
-                         -> thrift::Result<Xtruct> {
+    /// returns an Xtruct with:
+    /// string_thing = "Hello2", byte_thing = arg0, i32_thing = arg1 and
+    /// i64_thing = arg2
+    fn handle_test_multi(
+        &self,
+        arg0: i8,
+        arg1: i32,
+        arg2: i64,
+        _: BTreeMap<i16, String>,
+        _: Numberz,
+        _: UserId,
+    ) -> thrift::Result<Xtruct> {
         let x_ret = Xtruct {
             string_thing: Some("Hello2".to_owned()),
             byte_thing: Some(arg0),
@@ -273,65 +312,91 @@ impl ThriftTestSyncHandler for ThriftTestSyncHandlerImpl {
         Ok(x_ret)
     }
 
-    /// if arg == "Xception" throw Xception with errorCode = 1001 and message = arg
+    /// if arg == "Xception" throw Xception with errorCode = 1001 and message =
+    /// arg
     /// else if arg == "TException" throw TException
     /// else do not throw anything
-    fn handle_test_exception(&mut self, arg: String) -> thrift::Result<()> {
-        println!("testException({})", arg);
+    fn handle_test_exception(&self, arg: String) -> thrift::Result<()> {
+        info!("testException({})", arg);
 
         match &*arg {
             "Xception" => {
-                Err((Xception {
-                        error_code: Some(1001),
-                        message: Some(arg),
-                    })
-                    .into())
+                Err(
+                    (Xception {
+                             error_code: Some(1001),
+                             message: Some(arg),
+                         })
+                        .into(),
+                )
             }
             "TException" => Err("this is a random error".into()),
             _ => Ok(()),
         }
     }
 
-    /// if arg0 == "Xception" throw Xception with errorCode = 1001 and message = "This is an Xception"
-    /// else if arg0 == "Xception2" throw Xception2 with errorCode = 2002 and struct_thing.string_thing = "This is an Xception2"
-    // else do not throw anything and return Xtruct with string_thing = arg1
-    fn handle_test_multi_exception(&mut self,
-                                   arg0: String,
-                                   arg1: String)
-                                   -> thrift::Result<Xtruct> {
+    /// if arg0 == "Xception":
+    /// throw Xception with errorCode = 1001 and message = "This is an
+    /// Xception"
+    /// else if arg0 == "Xception2":
+    /// throw Xception2 with errorCode = 2002 and struct_thing.string_thing =
+    /// "This is an Xception2"
+    // else:
+    //   do not throw anything and return Xtruct with string_thing = arg1
+    fn handle_test_multi_exception(&self, arg0: String, arg1: String) -> thrift::Result<Xtruct> {
         match &*arg0 {
             "Xception" => {
-                Err((Xception {
-                        error_code: Some(1001),
-                        message: Some("This is an Xception".to_owned()),
-                    })
-                    .into())
+                Err(
+                    (Xception {
+                             error_code: Some(1001),
+                             message: Some("This is an Xception".to_owned()),
+                         })
+                        .into(),
+                )
             }
             "Xception2" => {
-                Err((Xception2 {
-                        error_code: Some(2002),
-                        struct_thing: Some(Xtruct {
-                            string_thing: Some("This is an Xception2".to_owned()),
-                            byte_thing: None,
-                            i32_thing: None,
-                            i64_thing: None,
-                        }),
-                    })
-                    .into())
+                Err(
+                    (Xception2 {
+                             error_code: Some(2002),
+                             struct_thing: Some(
+                            Xtruct {
+                                string_thing: Some("This is an Xception2".to_owned()),
+                                byte_thing: None,
+                                i32_thing: None,
+                                i64_thing: None,
+                            },
+                        ),
+                         })
+                        .into(),
+                )
             }
             _ => {
-                Ok(Xtruct {
-                    string_thing: Some(arg1),
-                    byte_thing: None,
-                    i32_thing: None,
-                    i64_thing: None,
-                })
+                Ok(
+                    Xtruct {
+                        string_thing: Some(arg1),
+                        byte_thing: None,
+                        i32_thing: None,
+                        i64_thing: None,
+                    },
+                )
             }
         }
     }
 
-    fn handle_test_oneway(&mut self, seconds_to_sleep: i32) -> thrift::Result<()> {
+    fn handle_test_oneway(&self, seconds_to_sleep: i32) -> thrift::Result<()> {
         thread::sleep(Duration::from_secs(seconds_to_sleep as u64));
         Ok(())
+    }
+}
+
+struct SecondServiceSyncHandlerImpl;
+impl SecondServiceSyncHandler for SecondServiceSyncHandlerImpl {
+    fn handle_blah_blah(&self) -> thrift::Result<()> {
+        Err(thrift::new_application_error(thrift::ApplicationErrorKind::Unknown, "blahBlah"),)
+    }
+
+    fn handle_secondtest_string(&self, thing: String) -> thrift::Result<String> {
+        info!("testString({})", &thing);
+        let ret = format!("testString(\"{}\")", &thing);
+        Ok(ret)
     }
 }

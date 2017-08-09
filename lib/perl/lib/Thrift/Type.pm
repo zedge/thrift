@@ -17,24 +17,34 @@
 # under the License.
 #
 
-# This probably should not go into "make check", because it is an experiment,
-# not a test.  Specifically, it is meant to determine how likely realloc is
-# to avoid a copy.  This is poorly documented.
+use 5.10.0;
+use strict;
+use warnings;
 
-run: realloc_test
-	for it in 1 4 64 ; do \
-		for nb in 1 8 64 512 ; do \
-			for mins in 64 512 ; do \
-				for maxs in 2048 262144 ; do \
-					for db in 8 64 ; do \
-						./realloc_test $$nb $$mins $$maxs $$db $$it \
-					; done \
-				; done \
-			; done \
-		; done \
-	; done \
-	> raw_stats
+use Thrift;
 
-CFLAGS = -Wall -g -std=c99
-LDLIBS = -ldl
-realloc_test: realloc_test.c
+#
+# Data types that can be sent via Thrift
+#
+package Thrift::TType;
+use version 0.77; our $VERSION = version->declare("$Thrift::VERSION");
+
+use constant STOP   => 0;
+use constant VOID   => 1;
+use constant BOOL   => 2;
+use constant BYTE   => 3;
+use constant I08    => 3;
+use constant DOUBLE => 4;
+use constant I16    => 6;
+use constant I32    => 8;
+use constant I64    => 10;
+use constant STRING => 11;
+use constant UTF7   => 11;
+use constant STRUCT => 12;
+use constant MAP    => 13;
+use constant SET    => 14;
+use constant LIST   => 15;
+use constant UTF8   => 16;
+use constant UTF16  => 17;
+
+1;

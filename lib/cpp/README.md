@@ -272,3 +272,20 @@ OpenSSL's RAND_poll() when OpenSSL library is first initialized.
 
 The PRNG seed is key to the application security. This method should be
 overridden if it's not strong enough for you.
+
+# Breaking Changes
+
+## 0.11.0
+
+In the pthread mutex implementation, the contention profiling code was enabled
+by default in all builds.  This changed to be disabled by default.  (THRIFT-4151)
+
+In older releases, if a TSSLSocketFactory's lifetime was not at least as long
+as the TSSLSockets it created, we silently reverted openssl to unsafe multithread behavior
+and so the results were undefined.  Changes were made in 0.11.0 that cause either an
+assertion or a core instead of undefined behavior.  The lifetime of a TSSLSocketFactory
+*must* be longer than any TSSLSocket that it creates, otherwise openssl will be cleaned
+up too early.  If the static boolean is set to disable openssl initialization and
+cleanup and leave it up to the consuming application, this requirement is not needed.
+(THRIFT-4164)
+

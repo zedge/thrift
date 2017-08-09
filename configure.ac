@@ -100,6 +100,10 @@ AC_PROG_RANLIB
 
 AC_LANG([C++])
 AX_CXX_COMPILE_STDCXX_11([noext], [optional])
+if test "$ac_success" = "no"; then
+  CXXFLAGS="$CXXFLAGS -Wno-variadic-macros -Wno-long-long -Wno-c++11-long-long"
+fi
+CXXFLAGS="$CXXFLAGS -Wno-deprecated-register"
 
 AM_EXTRA_RECURSIVE_TARGETS([style])
 AC_SUBST(CPPSTYLE_CMD, 'find . -type f \( -iname "*.h" -or -iname "*.cpp" -or -iname "*.cc" -or -iname "*.tcc" \) -printf "Reformatting: %h/%f\n" -exec clang-format -i {} \;')
@@ -132,7 +136,6 @@ if test "$enable_libs" = "no"; then
   with_rs="no"
 fi
 
-
 AX_THRIFT_LIB(cpp, [C++], yes)
 have_cpp=no
 if test "$with_cpp" = "yes";  then
@@ -146,8 +149,6 @@ if test "$with_cpp" = "yes";  then
     AC_SUBST([BOOST_THREAD_LDADD], [$(echo "$BOOST_LIB_DIR/libboost_thread.a")])
     have_cpp="yes"
   fi
-
-  AX_CHECK_OPENSSL()
 
   AX_LIB_EVENT([1.0])
   have_libevent=$success
@@ -198,6 +199,12 @@ if test "$with_c_glib" = "yes"; then
   fi
 fi
 AM_CONDITIONAL(WITH_C_GLIB, [test "$have_glib2" = "yes" -a "$have_gobject2" = "yes"])
+
+echo "OpenSSL check"
+if test "$have_cpp" = "yes" -o "$have_c_glib" = "yes";  then
+  echo "Have cpp or c so we check for OpenSSL"
+  AX_CHECK_OPENSSL()
+fi
 
 AX_THRIFT_LIB(csharp, [C#], yes)
 if test "$with_csharp" = "yes";  then
@@ -390,7 +397,7 @@ if test "$with_go" = "yes";  then
   AC_PATH_PROG([GO], [go])
   if [[ -x "$GO" ]] ; then
     AS_IF([test -n "$GO"],[
-      ax_go_version="1.4"
+      ax_go_version="1.7"
 
       AC_MSG_CHECKING([for Go version])
       golang_version=`$GO version 2>&1 | $SED -e 's/\(go \)\(version \)\(go\)\(@<:@0-9@:>@.@<:@0-9@:>@.@<:@0-9@:>@\)\(@<:@\*@:>@*\).*/\4/'`
@@ -657,7 +664,9 @@ AC_CHECK_DECL([AI_ADDRCONFIG], [],
 
 AC_FUNC_ALLOCA
 AC_FUNC_FORK
+AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
+AC_FUNC_REALLOC
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STAT
 AC_FUNC_STRERROR_R
@@ -906,8 +915,8 @@ if test "$have_cpp" = "yes" ; then
   echo "C++ Library:"
   echo "   Build TZlibTransport ...... : $have_zlib"
   echo "   Build TNonblockingServer .. : $have_libevent"
-  echo "   Build TQTcpServer (Qt4) .... : $have_qt"
-  echo "   Build TQTcpServer (Qt5) .... : $have_qt5"
+  echo "   Build TQTcpServer (Qt4) ... : $have_qt"
+  echo "   Build TQTcpServer (Qt5) ... : $have_qt5"
 fi
 if test "$have_java" = "yes" ; then
   echo
@@ -999,7 +1008,7 @@ fi
 if test "$have_lua" = "yes" ; then
   echo
   echo "Lua Library:"
-  echo "   Using Lua .............. : $LUA"
+  echo "   Using Lua ................. : $LUA"
 fi
 if test "$have_rs" = "yes" ; then
   echo

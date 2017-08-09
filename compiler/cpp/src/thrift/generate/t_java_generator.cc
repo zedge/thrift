@@ -70,6 +70,7 @@ public:
     use_option_type_ = false;
     undated_generated_annotations_  = false;
     suppress_generated_annotations_ = false;
+    handle_runtime_exceptions_ = false;
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("beans") == 0) {
         bean_style_ = true;
@@ -91,6 +92,8 @@ public:
         reuse_objects_ = true;
       } else if( iter->first.compare("option_type") == 0) {
         use_option_type_ = true;
+      } else if( iter->first.compare("handle_runtime_exceptions") == 0) {
+        handle_runtime_exceptions_ = true;
       } else if( iter->first.compare("generated_annotations") == 0) {
         if( iter->second.compare("undated") == 0) {
           undated_generated_annotations_  = true;
@@ -367,6 +370,7 @@ private:
   bool use_option_type_;
   bool undated_generated_annotations_;
   bool suppress_generated_annotations_;
+  bool handle_runtime_exceptions_;
 
 };
 
@@ -444,10 +448,6 @@ void t_java_generator::generate_enum(t_enum* tenum) {
 
   // Comment and package it
   f_enum << autogen_comment() << java_package() << endl;
-
-  // Add java imports
-  f_enum << string() + "import java.util.Map;\n" + "import java.util.HashMap;\n"
-            + "import org.apache.thrift.TEnum;" << endl << endl;
 
   generate_java_doc(f_enum, tenum);
   if (is_deprecated) {
@@ -874,7 +874,7 @@ void t_java_generator::generate_union_constructor(ofstream& out, t_struct* tstru
     indent(out) << "  return x;" << endl;
     indent(out) << "}" << endl << endl;
 
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       indent(out) << "public static " << type_name(tstruct) << " " << (*m_iter)->get_name()
                   << "(byte[] value) {" << endl;
       indent(out) << "  " << type_name(tstruct) << " x = new " << type_name(tstruct) << "();"
@@ -905,7 +905,7 @@ void t_java_generator::generate_union_getters_and_setters(ofstream& out, t_struc
     bool is_deprecated = this->is_deprecated(field->annotations_);
 
     generate_java_doc(out, field);
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       if (is_deprecated) {
         indent(out) << "@Deprecated" << endl;
       }
@@ -952,7 +952,7 @@ void t_java_generator::generate_union_getters_and_setters(ofstream& out, t_struc
     out << endl;
 
     generate_java_doc(out, field);
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       if (is_deprecated) {
         indent(out) << "@Deprecated" << endl;
       }
@@ -1488,7 +1488,7 @@ void t_java_generator::generate_java_struct_definition(ofstream& out,
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
       if ((*m_iter)->get_req() != t_field::T_OPTIONAL) {
         t_type* type = get_true_type((*m_iter)->get_type());
-        if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+        if (type->is_binary()) {
           indent(out) << "this." << (*m_iter)->get_name()
                       << " = org.apache.thrift.TBaseHelper.copyBinary(" << (*m_iter)->get_name()
                       << ");" << endl;
@@ -1642,7 +1642,7 @@ void t_java_generator::generate_java_struct_parcelable(ofstream& out, t_struct* 
     } else if (t->is_map()) {
       indent(out) << "out.writeMap(" << name << ");" << endl;
     } else if (t->is_base_type()) {
-      if (((t_base_type*)t)->is_binary()) {
+      if (t->is_binary()) {
         indent(out) << "out.writeInt(" << name << "!=null ? 1 : 0);" << endl;
         indent(out) << "if(" << name << " != null) { " << endl;
         indent_up();
@@ -1853,7 +1853,7 @@ void t_java_generator::generate_java_struct_equality(ofstream& out, t_struct* ts
         << "this_present_" << name << " && that_present_" << name << "))" << endl << indent()
         << "  return false;" << endl;
 
-    if (t->is_base_type() && ((t_base_type*)t)->is_binary()) {
+    if (t->is_binary()) {
       unequal = "!this." + name + ".equals(that." + name + ")";
     } else if (can_be_null) {
       unequal = "!this." + name + ".equals(that." + name + ")";
@@ -2094,7 +2094,7 @@ void t_java_generator::generate_reflection_setters(ostringstream& out,
                                                    t_type* type,
                                                    string field_name,
                                                    string cap_name) {
-  const bool is_binary = type->is_base_type() && ((t_base_type*)type)->is_binary();
+  const bool is_binary = type->is_binary();
   indent(out) << "case " << constant_name(field_name) << ":" << endl;
   indent_up();
   indent(out) << "if (value == null) {" << endl;
@@ -2327,7 +2327,7 @@ void t_java_generator::generate_java_bean_boilerplate(ofstream& out, t_struct* t
 
     // Simple getter
     generate_java_doc(out, field);
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       if (is_deprecated) {
         indent(out) << "@Deprecated" << endl;
       }
@@ -2388,7 +2388,7 @@ void t_java_generator::generate_java_bean_boilerplate(ofstream& out, t_struct* t
 
     // Simple setter
     generate_java_doc(out, field);
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       if (is_deprecated) {
         indent(out) << "@Deprecated" << endl;
       }
@@ -2418,7 +2418,7 @@ void t_java_generator::generate_java_bean_boilerplate(ofstream& out, t_struct* t
     out << " set" << cap_name << "(" << type_name(type) << " " << field_name << ") {" << endl;
     indent_up();
     indent(out) << "this." << field_name << " = ";
-    if (type->is_base_type() && ((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       out << "org.apache.thrift.TBaseHelper.copyBinary(" << field_name << ")";
     } else {
       out << field_name;
@@ -2526,20 +2526,15 @@ void t_java_generator::generate_java_struct_tostring(ofstream& out, t_struct* ts
       indent_up();
     }
 
-    if (get_true_type(field->get_type())->is_base_type()
-        && ((t_base_type*)(get_true_type(field->get_type())))->is_binary()) {
+    if (get_true_type(field->get_type())->is_binary()) {
       indent(out) << "org.apache.thrift.TBaseHelper.toString(this." << field->get_name() << ", sb);"
                   << endl;
     } else if ((field->get_type()->is_set())
-               && (get_true_type(((t_set*)field->get_type())->get_elem_type())->is_base_type())
-               && (((t_base_type*)get_true_type(((t_set*)field->get_type())->get_elem_type()))
-                       ->is_binary())) {
+               && (get_true_type(((t_set*)field->get_type())->get_elem_type())->is_binary())) {
       indent(out) << "org.apache.thrift.TBaseHelper.toString(this." << field->get_name() << ", sb);"
                   << endl;
     } else if ((field->get_type()->is_list())
-               && (get_true_type(((t_list*)field->get_type())->get_elem_type())->is_base_type())
-               && (((t_base_type*)get_true_type(((t_list*)field->get_type())->get_elem_type()))
-                       ->is_binary())) {
+               && (get_true_type(((t_list*)field->get_type())->get_elem_type())->is_binary())) {
       indent(out) << "org.apache.thrift.TBaseHelper.toString(this." << field->get_name() << ", sb);"
                   << endl;
     } else {
@@ -2690,7 +2685,7 @@ void t_java_generator::generate_field_value_meta_data(std::ofstream& out, t_type
     } else if (type->is_set()) {
       indent(out)
           << "new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, ";
-      t_type* elem_type = ((t_list*)type)->get_elem_type();
+      t_type* elem_type = ((t_set*)type)->get_elem_type();
       generate_field_value_meta_data(out, elem_type);
     } else { // map
       indent(out)
@@ -2710,7 +2705,7 @@ void t_java_generator::generate_field_value_meta_data(std::ofstream& out, t_type
                 << get_java_type_string(type);
     if (type->is_typedef()) {
       indent(out) << ", \"" << ((t_typedef*)type)->get_symbolic() << "\"";
-    } else if (((t_base_type*)type)->is_binary()) {
+    } else if (type->is_binary()) {
       indent(out) << ", true";
     }
   }
@@ -3531,6 +3526,11 @@ void t_java_generator::generate_process_function(t_service* tservice, t_function
   indent(f_service_) << "  return " << ((tfunction->is_oneway()) ? "true" : "false") << ";" << endl;
   indent(f_service_) << "}" << endl << endl;
 
+  indent(f_service_) << "@Override" << endl;
+  indent(f_service_) << "protected boolean handleRuntimeExceptions() {" << endl;
+  indent(f_service_) << "  return " << ((handle_runtime_exceptions_) ? "true" : "false") << ";" << endl;
+  indent(f_service_) << "}" << endl << endl;
+
   indent(f_service_) << "public " << resultname << " getResult(I iface, " << argsname
                      << " args) throws org.apache.thrift.TException {" << endl;
   indent_up();
@@ -3642,7 +3642,7 @@ void t_java_generator::generate_deserialize_field(ofstream& out,
       throw "compiler error: cannot serialize void field in a struct: " + name;
       break;
     case t_base_type::TYPE_STRING:
-      if (((t_base_type*)type)->is_binary()) {
+      if (type->is_binary()) {
         out << "readBinary();";
       } else {
         out << "readString();";
@@ -3748,7 +3748,7 @@ void t_java_generator::generate_deserialize_container(ofstream& out,
     } else if (ttype->is_list()) {
       indent(out) << "org.apache.thrift.protocol.TList " << obj
                   << " = new org.apache.thrift.protocol.TList("
-                  << type_to_enum(((t_set*)ttype)->get_elem_type()) << ", iprot.readI32());"
+                  << type_to_enum(((t_list*)ttype)->get_elem_type()) << ", iprot.readI32());"
                   << endl;
     }
   }
@@ -3927,7 +3927,7 @@ void t_java_generator::generate_serialize_field(ofstream& out,
         throw "compiler error: cannot serialize void field in a struct: " + name;
         break;
       case t_base_type::TYPE_STRING:
-        if (((t_base_type*)type)->is_binary()) {
+        if (type->is_binary()) {
           out << "writeBinary(" << name << ");";
         } else {
           out << "writeString(" << name << ");";
@@ -4631,7 +4631,7 @@ void t_java_generator::generate_deep_copy_container(ofstream& out,
       indent(out) << result_name << ".add(" << result_element_name << ");" << endl;
     } else {
       // iterative copy
-      if (((t_base_type*)elem_type)->is_binary()) {
+      if (elem_type->is_binary()) {
         indent(out) << "java.nio.ByteBuffer temp_binary_element = ";
         generate_deep_copy_non_container(out,
                                          iterator_element_name,
@@ -4657,8 +4657,9 @@ void t_java_generator::generate_deep_copy_non_container(ofstream& out,
                                                         std::string dest_name,
                                                         t_type* type) {
   (void)dest_name;
+  type = get_true_type(type);
   if (type->is_base_type() || type->is_enum() || type->is_typedef()) {
-    if (((t_base_type*)type)->is_binary()) {
+    if (type->is_binary()) {
       out << "org.apache.thrift.TBaseHelper.copyBinary(" << source_name << ")";
     } else {
       // everything else can be copied directly
@@ -5269,6 +5270,9 @@ THRIFT_REGISTER_GENERATOR(
     "    android_legacy:  Do not use java.io.IOException(throwable) (available for Android 2.3 and "
     "above).\n"
     "    option_type:     Wrap optional fields in an Option type.\n"
+    "    handle_runtime_exceptions:\n"
+    "                     Send TApplicationException to the client when RuntimeException occurs on "
+    "the server. (Default behavior is to close the connection instead.)\n"
     "    java5:           Generate Java 1.5 compliant code (includes android_legacy flag).\n"
     "    reuse-objects:   Data objects will not be allocated, but existing instances will be used "
     "(read and write).\n"

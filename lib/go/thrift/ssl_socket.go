@@ -48,6 +48,9 @@ func NewTSSLSocket(hostPort string, cfg *tls.Config) (*TSSLSocket, error) {
 // NewTSSLSocketTimeout creates a net.Conn-backed TTransport, given a host and port
 // it also accepts a tls Configuration and a timeout as a time.Duration
 func NewTSSLSocketTimeout(hostPort string, cfg *tls.Config, timeout time.Duration) (*TSSLSocket, error) {
+	if cfg.MinVersion == 0 {
+		cfg.MinVersion = tls.VersionTLS10
+	}
 	return &TSSLSocket{hostPort: hostPort, timeout: timeout, cfg: cfg}, nil
 }
 
@@ -166,6 +169,5 @@ func (p *TSSLSocket) Interrupt() error {
 
 func (p *TSSLSocket) RemainingBytes() (num_bytes uint64) {
 	const maxSize = ^uint64(0)
-	return maxSize  // the thruth is, we just don't know unless framed is used
+	return maxSize // the thruth is, we just don't know unless framed is used
 }
-

@@ -6,12 +6,23 @@
     ],
     "server": {
       "command": [
-        "test_server"
+        "test_server",
+        "--lt-debug"
       ]
     },
     "client": {
       "command": [
-        "test_client"
+        "test_client",
+        "--lt-debug"
+      ],
+      "protocols": [
+        "multi",
+        "multic",
+        "multi:binary",
+        "multic:compact"
+      ],
+      "sockets": [
+        "ip-ssl"
       ]
     },
     "transports": [
@@ -103,7 +114,15 @@
     ],
     "server": {
       "delay": 10,
-      "extra_args": ["run-testserver"]
+      "extra_args": ["run-testserver"],
+      "protocols": [
+        "binary:multi",
+        "compact:multic",
+        "json:multij",
+        "multi",
+        "multic",
+        "multij"
+      ]
     },
     "client": {
       "timeout": 13,
@@ -118,12 +137,12 @@
       "framed:fastframed"
     ],
     "sockets": [
-      "ip-ssl",
-      "ip"
+      "ip",
+      "ip-ssl"
     ],
     "protocols": [
-      "compact",
       "binary",
+      "compact",
       "json"
     ],
     "workdir": "../lib/java"
@@ -411,7 +430,9 @@
         "-Igen-perl/",
         "-I../../lib/perl/lib/",
         "TestClient.pl",
-        "--cert=../keys/client.pem"
+        "--ca=../keys/CA.pem",
+        "--cert=../keys/client.crt",
+        "--key=../keys/client.key"
       ]
     },
     "server": {
@@ -420,7 +441,7 @@
         "-Igen-perl/",
         "-I../../lib/perl/lib/",
         "TestServer.pl",
-        "--cert=../keys/server.pem",
+        "--cert=../keys/server.crt",
         "--key=../keys/server.key"
       ]
     },
@@ -577,6 +598,10 @@
   },
   {
     "name": "rs",
+    "env": {
+      "RUST_BACKTRACE": "1",
+      "RUST_LOG": "info"
+    },
     "server": {
       "command": [
         "test_server"
@@ -588,16 +613,18 @@
         "test_client"
       ]
     },
+    "sockets": [
+      "ip"
+    ],
     "transports": [
       "buffered",
       "framed"
     ],
-    "sockets": [
-      "ip"
-    ],
     "protocols": [
       "binary",
-      "compact"
+      "compact",
+      "multi",
+      "multic"
     ],
     "workdir": "rs/bin"
   }

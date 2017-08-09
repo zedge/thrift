@@ -21,13 +21,15 @@ extern crate clap;
 extern crate kitchen_sink;
 extern crate thrift;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::convert::Into;
 
 use kitchen_sink::base_two::{TNapkinServiceSyncClient, TRamenServiceSyncClient};
 use kitchen_sink::midlayer::{MealServiceSyncClient, TMealServiceSyncClient};
+use kitchen_sink::recursive;
+use kitchen_sink::recursive::{CoRec, CoRec2, RecList, RecTree, TTestServiceSyncClient};
 use kitchen_sink::ultimate::{FullMealServiceSyncClient, TFullMealServiceSyncClient};
-use thrift::transport::{TFramedTransport, TTcpTransport, TTransport};
+use thrift::transport::{ReadHalf, TFramedReadTransport, TFramedWriteTransport, TIoChannel,
+                        TTcpChannel, WriteHalf};
 use thrift::protocol::{TBinaryInputProtocol, TBinaryOutputProtocol, TCompactInputProtocol,
                        TCompactOutputProtocol, TInputProtocol, TOutputProtocol};
 
@@ -49,25 +51,26 @@ fn run() -> thrift::Result<()> {
         (@arg host: --host +takes_value "Host on which the Thrift test server is located")
         (@arg port: --port +takes_value "Port on which the Thrift test server is listening")
         (@arg protocol: --protocol +takes_value "Thrift protocol implementation to use (\"binary\", \"compact\")")
-        (@arg service: --service +takes_value "Service type to contact (\"part\", \"full\")")
-    ).get_matches();
+        (@arg service: --service +takes_value "Service type to contact (\"part\", \"full\", \"recursive\")")
+    )
+            .get_matches();
 
     let host = matches.value_of("host").unwrap_or("127.0.0.1");
     let port = value_t!(matches, "port", u16).unwrap_or(9090);
     let protocol = matches.value_of("protocol").unwrap_or("compact");
     let service = matches.value_of("service").unwrap_or("part");
 
-    let t = open_tcp_transport(host, port)?;
-    let t = Rc::new(RefCell::new(Box::new(TFramedTransport::new(t)) as Box<TTransport>));
+    let (i_chan, o_chan) = tcp_channel(host, port)?;
+    let (i_tran, o_tran) = (TFramedReadTransport::new(i_chan), TFramedWriteTransport::new(o_chan));
 
     let (i_prot, o_prot): (Box<TInputProtocol>, Box<TOutputProtocol>) = match protocol {
         "binary" => {
-            (Box::new(TBinaryInputProtocol::new(t.clone(), true)),
-             Box::new(TBinaryOutputProtocol::new(t.clone(), true)))
+            (Box::new(TBinaryInputProtocol::new(i_tran, true)),
+             Box::new(TBinaryOutputProtocol::new(o_tran, true)))
         }
         "compact" => {
-            (Box::new(TCompactInputProtocol::new(t.clone())),
-             Box::new(TCompactOutputProtocol::new(t.clone())))
+            (Box::new(TCompactInputProtocol::new(i_tran)),
+             Box::new(TCompactOutputProtocol::new(o_tran)))
         }
         unmatched => return Err(format!("unsupported protocol {}", unmatched).into()),
     };
@@ -75,68 +78,203 @@ fn run() -> thrift::Result<()> {
     run_client(service, i_prot, o_prot)
 }
 
-fn run_client(service: &str,
-              i_prot: Box<TInputProtocol>,
-              o_prot: Box<TOutputProtocol>)
-              -> thrift::Result<()> {
+fn run_client(
+    service: &str,
+    i_prot: Box<TInputProtocol>,
+    o_prot: Box<TOutputProtocol>,
+) -> thrift::Result<()> {
     match service {
-        "full" => run_full_meal_service(i_prot, o_prot),
-        "part" => run_meal_service(i_prot, o_prot),
-        _ => Err(thrift::Error::from(format!("unknown service type {}", service))),
+        "full" => exec_full_meal_client(i_prot, o_prot),
+        "part" => exec_meal_client(i_prot, o_prot),
+        "recursive" => exec_recursive_client(i_prot, o_prot),
+        _ => Err(thrift::Error::from(format!("unknown service type {}", service)),),
     }
 }
 
-fn open_tcp_transport(host: &str, port: u16) -> thrift::Result<Rc<RefCell<Box<TTransport>>>> {
-    let mut t = TTcpTransport::new();
-    match t.open(&format!("{}:{}", host, port)) {
-        Ok(()) => Ok(Rc::new(RefCell::new(Box::new(t) as Box<TTransport>))),
-        Err(e) => Err(e),
-    }
+fn tcp_channel(
+    host: &str,
+    port: u16,
+) -> thrift::Result<(ReadHalf<TTcpChannel>, WriteHalf<TTcpChannel>)> {
+    let mut c = TTcpChannel::new();
+    c.open(&format!("{}:{}", host, port))?;
+    c.split()
 }
 
-fn run_meal_service(i_prot: Box<TInputProtocol>,
-                    o_prot: Box<TOutputProtocol>)
-                    -> thrift::Result<()> {
+fn exec_meal_client(
+    i_prot: Box<TInputProtocol>,
+    o_prot: Box<TOutputProtocol>,
+) -> thrift::Result<()> {
     let mut client = MealServiceSyncClient::new(i_prot, o_prot);
 
     // client.full_meal(); // <-- IMPORTANT: if you uncomment this, compilation *should* fail
     // this is because the MealService struct does not contain the appropriate service marker
 
     // only the following three calls work
-    execute_call("part", "ramen", || client.ramen(50))?;
-    execute_call("part", "meal", || client.meal())?;
-    execute_call("part", "napkin", || client.napkin())?;
+    execute_call("part", "ramen", || client.ramen(50))
+        .map(|_| ())?;
+    execute_call("part", "meal", || client.meal())
+        .map(|_| ())?;
+    execute_call("part", "napkin", || client.napkin())
+        .map(|_| ())?;
 
     Ok(())
 }
 
-fn run_full_meal_service(i_prot: Box<TInputProtocol>,
-                         o_prot: Box<TOutputProtocol>)
-                         -> thrift::Result<()> {
+fn exec_full_meal_client(
+    i_prot: Box<TInputProtocol>,
+    o_prot: Box<TOutputProtocol>,
+) -> thrift::Result<()> {
     let mut client = FullMealServiceSyncClient::new(i_prot, o_prot);
 
-    execute_call("full", "ramen", || client.ramen(100))?;
-    execute_call("full", "meal", || client.meal())?;
-    execute_call("full", "napkin", || client.napkin())?;
-    execute_call("full", "full meal", || client.full_meal())?;
+    execute_call("full", "ramen", || client.ramen(100))
+        .map(|_| ())?;
+    execute_call("full", "meal", || client.meal())
+        .map(|_| ())?;
+    execute_call("full", "napkin", || client.napkin())
+        .map(|_| ())?;
+    execute_call("full", "full meal", || client.full_meal())
+        .map(|_| ())?;
 
     Ok(())
 }
 
-fn execute_call<F, R>(service_type: &str, call_name: &str, mut f: F) -> thrift::Result<()>
-    where F: FnMut() -> thrift::Result<R>
+fn exec_recursive_client(
+    i_prot: Box<TInputProtocol>,
+    o_prot: Box<TOutputProtocol>,
+) -> thrift::Result<()> {
+    let mut client = recursive::TestServiceSyncClient::new(i_prot, o_prot);
+
+    let tree = RecTree {
+        children: Some(
+            vec![
+                Box::new(
+                    RecTree {
+                        children: Some(
+                            vec![
+                                Box::new(
+                                    RecTree {
+                                        children: None,
+                                        item: Some(3),
+                                    },
+                                ),
+                                Box::new(
+                                    RecTree {
+                                        children: None,
+                                        item: Some(4),
+                                    },
+                                ),
+                            ],
+                        ),
+                        item: Some(2),
+                    },
+                ),
+            ],
+        ),
+        item: Some(1),
+    };
+
+    let expected_tree = RecTree {
+        children: Some(
+            vec![
+                Box::new(
+                    RecTree {
+                        children: Some(
+                            vec![
+                                Box::new(
+                                    RecTree {
+                                        children: Some(Vec::new()), // remote returns an empty list
+                                        item: Some(3),
+                                    },
+                                ),
+                                Box::new(
+                                    RecTree {
+                                        children: Some(Vec::new()), // remote returns an empty list
+                                        item: Some(4),
+                                    },
+                                ),
+                            ],
+                        ),
+                        item: Some(2),
+                    },
+                ),
+            ],
+        ),
+        item: Some(1),
+    };
+
+    let returned_tree = execute_call("recursive", "echo_tree", || client.echo_tree(tree.clone()))?;
+    if returned_tree != expected_tree {
+        return Err(
+            format!(
+                "mismatched recursive tree {:?} {:?}",
+                expected_tree,
+                returned_tree
+            )
+                    .into(),
+        );
+    }
+
+    let list = RecList {
+        nextitem: Some(
+            Box::new(
+                RecList {
+                    nextitem: Some(
+                        Box::new(
+                            RecList {
+                                nextitem: None,
+                                item: Some(3),
+                            },
+                        ),
+                    ),
+                    item: Some(2),
+                },
+            ),
+        ),
+        item: Some(1),
+    };
+    let returned_list = execute_call("recursive", "echo_list", || client.echo_list(list.clone()))?;
+    if returned_list != list {
+        return Err(format!("mismatched recursive list {:?} {:?}", list, returned_list).into(),);
+    }
+
+    let co_rec = CoRec {
+        other: Some(
+            Box::new(
+                CoRec2 {
+                    other: Some(CoRec { other: Some(Box::new(CoRec2 { other: None })) }),
+                },
+            ),
+        ),
+    };
+    let returned_co_rec = execute_call(
+        "recursive",
+        "echo_co_rec",
+        || client.echo_co_rec(co_rec.clone()),
+    )?;
+    if returned_co_rec != co_rec {
+        return Err(format!("mismatched co_rec {:?} {:?}", co_rec, returned_co_rec).into(),);
+    }
+
+    Ok(())
+}
+
+fn execute_call<F, R>(service_type: &str, call_name: &str, mut f: F) -> thrift::Result<R>
+where
+    F: FnMut() -> thrift::Result<R>,
 {
     let res = f();
 
     match res {
         Ok(_) => println!("{}: completed {} call", service_type, call_name),
         Err(ref e) => {
-            println!("{}: failed {} call with error {:?}",
-                     service_type,
-                     call_name,
-                     e)
+            println!(
+                "{}: failed {} call with error {:?}",
+                service_type,
+                call_name,
+                e
+            )
         }
     }
 
-    res.map(|_| ())
+    res
 }

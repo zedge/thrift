@@ -10,10 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Apache Thrift Docker build environment for Centos
+# Apache Thrift Docker build environment for Debian
 #
 # Known missing client libraries:
-#  - None
+#  - dotnetcore
+#  - rust
 
 FROM buildpack-deps:jessie-scm
 MAINTAINER Apache Thrift <dev@thrift.apache.org>
@@ -21,6 +22,9 @@ MAINTAINER Apache Thrift <dev@thrift.apache.org>
 ENV DEBIAN_FRONTEND noninteractive
 
 # Add apt sources
+# jessie-backports for cmake and some ruby bits
+RUN echo "deb http://ftp.debian.org/debian jessie-backports main" > /etc/apt/sources.list.d/jessie-backports.list
+
 # Dart
 RUN curl https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
     curl https://storage.googleapis.com/download.dartlang.org/linux/debian/dart_stable.list > /etc/apt/sources.list.d/dart_stable.list && \
@@ -31,12 +35,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       bison \
       build-essential \
       clang \
-      cmake \
       debhelper \
       flex \
-      pkg-config
+      pkg-config && \
+    apt-get -t jessie-backports install -y --no-install-recommends cmake
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
 `# C++ dependencies` \
       libboost-dev \
       libboost-filesystem-dev \
@@ -50,14 +54,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       qtbase5-dev \
       qtbase5-dev-tools
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
 `# Java dependencies` \
       ant \
       ant-optional \
       openjdk-7-jdk \
       maven
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
 `# Python dependencies` \
       python-all \
       python-all-dbg \
@@ -72,7 +76,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-setuptools \
       python3-pip
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
 `# Ruby dependencies` \
       ruby \
       ruby-dev \
@@ -83,9 +87,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libio-socket-ssl-perl \
       libnet-ssleay-perl
 
-RUN echo "deb http://ftp.debian.org/debian jessie-backports main" > /etc/apt/sources.list.d/jessie-backports.list
-RUN apt-get update && apt-get -t jessie-backports install -y ruby-bundler
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -t jessie-backports install -y ruby-bundler
+RUN apt-get install -y --no-install-recommends \
 `# Php dependencies` \
       php5 \
       php5-dev \
@@ -152,12 +155,12 @@ RUN pip2 install -U ipaddress backports.ssl_match_hostname tornado
 RUN pip3 install -U backports.ssl_match_hostname tornado
 
 # Go
-RUN curl -sSL https://storage.googleapis.com/golang/go1.4.3.linux-amd64.tar.gz | tar -C /usr/local/ -xz
+RUN curl -sSL https://storage.googleapis.com/golang/go1.8.3.linux-amd64.tar.gz | tar -C /usr/local/ -xz
 ENV PATH /usr/local/go/bin:$PATH
 
 # Haxe
 RUN mkdir -p /usr/lib/haxe && \
-    curl http://haxe.org/website-content/downloads/3.2.0/downloads/haxe-3.2.0-linux64.tar.gz | \
+    wget -O - https://github.com/HaxeFoundation/haxe/releases/download/3.2.1/haxe-3.2.1-linux64.tar.gz | \
     tar -C /usr/lib/haxe --strip-components=1 -xz && \
     ln -s /usr/lib/haxe/haxe /usr/bin/haxe && \
     ln -s /usr/lib/haxe/haxelib /usr/bin/haxelib && \
@@ -182,6 +185,15 @@ RUN curl -sSL http://downloads.dlang.org/releases/2.x/2.070.0/dmd_2.070.0-0_amd6
 
 # Dart
 ENV PATH /usr/lib/dart/bin:$PATH
+
+# OCaml
+RUN echo 'deb http://ppa.launchpad.net/avsm/ppa/ubuntu trusty main' > /etc/apt/sources.list.d/avsm-official-ocaml.list && \
+    gpg --keyserver keyserver.ubuntu.com --recv 61707B09 && \
+    gpg --export --armor 61707B09 | apt-key add - && \
+    apt-get update && \
+    apt-get install -y ocaml opam && \
+    opam init && \
+    opam install oasis
 
 # Force utf8 locale to successfully build Haskell tf-random
 ENV LC_ALL C.UTF-8

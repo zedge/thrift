@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
 s.name             = "Thrift"
-s.version          = "20170207"
+s.version          = "20170918.3"
 s.summary          = "Thrift framework in Swift 3.0"
 
 # This description is used to generate tags and improve search results.
